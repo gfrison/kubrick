@@ -59,4 +59,4 @@ inThisBuild(
     )
   )
 )
-addCommandAlias("reorder", "scalafixAll;scalafmtAll;test")
+addCommandAlias("reorder", "scalafixAll;scalafmtAll;headerCreate;test")
