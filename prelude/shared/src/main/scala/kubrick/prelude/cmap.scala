@@ -31,6 +31,9 @@ object cmap:
 
   case class Cmap[+K, +V](entries: Iterable[(K, V)]):
     export entries.{size, isEmpty, nonEmpty}
+    def tail: Cmap[K, V]           = Cmap(entries.tail)
+    def head: (K, V)               = entries.head
+    def headOption: Option[(K, V)] = entries.headOption
     private lazy val hashes = entries.foldLeft(IntMap.empty[Seq[(K, V)]]):
       case (acc, kvals) =>
         acc.updated(

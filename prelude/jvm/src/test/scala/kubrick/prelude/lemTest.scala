@@ -33,16 +33,14 @@ import scala.collection.immutable.ArraySeq
 class lem2Test extends AsyncFreeSpec with Matchers:
   "construction" in:
     Sek(1, 2, 3) shouldBe Sek(L1(1), L1(2), L1(3))
-    1 +: Sek(2, 3) shouldBe Sek(1, 2, 3)
-    1 ++: Sek(2, 3) shouldBe Sek(1, Sek(2, 3))
-    1 ++: 2 shouldBe Sek(1, 2)
+    (Sek(1, 2) :+ 3) shouldBe Sek(1, 2, 3)
+    (1 +: Sek(2, 3)) shouldBe Sek(1, 2, 3)
     Sek(1, 2) + 3 shouldBe new Sek(ArraySeq(L1(1), L1(2)), Cmap((L1(3), L0)))
-    Sek(1, 2) + Sek(3, 4) shouldBe new Sek(ArraySeq(L1(1), L1(2), L1(3), L1(4)))
-    1 ++ 2 shouldBe Choice(1, 2)
+    Sek(1, 2) ++ Sek(3, 4) shouldBe new Sek(ArraySeq(L1(1), L1(2), L1(3), L1(4)))
+    L1(1) + L1(2) shouldBe Choice(L1(1), L1(2))
     1 --> 2 shouldBe Pair(L1(1), L1(2))
-    (1 --> 2) ++: 3 shouldBe Sek(Pair(L1(1), L1(2)), L1(3))
-    (((1 --> 2) :++ 3) + 4) shouldBe (Sek(Pair(1, 2), L1(3)) + 4)
-
+    ((1 --> 2) +: 3 +: L0) shouldBe Sek(Pair(L1(1), L1(2)), L1(3))
+    (((1 --> 2) :+ 3) + 4) shouldBe new Sek(ArraySeq(L1(3)), Cmap.from(Map((L1(1), L1(2)), (L1(4), L0))))
   "map aggregate" in:
     L1(10).map(_ + 1) shouldBe L1(11)
     Pair(L1(1), L1(2)).map(_ + 1) shouldBe Pair(L1(2), L1(3))
@@ -97,3 +95,31 @@ class lem2Test extends AsyncFreeSpec with Matchers:
       case l --> r => (l, r)
     left shouldBe L1(1)
     right shouldBe L1(2)
+  "unapply + L1" in:
+    val lem = L1(1) + 2
+    val (head, tail) = lem match
+      case h + t => (h, t)
+    head shouldBe L1(1)
+    tail shouldBe new Choice(Cmap((L1(2), L0)))
+  "unapply + Choice" in:
+    val lem = Choice(1, 2, 3)
+    val (head, tail) = lem match
+      case h + t => (h, t)
+    head shouldBe L1(1)
+    tail shouldBe Choice(2, 3)
+  "unapply + Sek" in:
+    val lem = Sek(1, 2) + 3
+    val (head, tail) = lem match
+      case h + t => (h, t)
+    head shouldBe L1(3)
+    tail shouldBe Sek(1, 2)
+  "unapply + L0" in:
+    L0 match
+      case _ + _ => fail("Should not match")
+      case _     => succeed
+  "unapply + Sek Pair" in:
+    val lem = Sek(1, 2) + (3 --> 4)
+    val (head, tail) = lem match
+      case h + t => (h, t)
+    head shouldBe (3 --> 4)
+    tail shouldBe Sek(1, 2)

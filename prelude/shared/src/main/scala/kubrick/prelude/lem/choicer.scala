@@ -20,15 +20,19 @@
  */
 
 package kubrick.prelude.lem
-import scala.compiletime.asMatchable
-object all:
-  given [T] => Conversion[T, Lem[T]] = (p: T) =>
-    p.asMatchable match
-      case lem: Lem[?] => lem.asInstanceOf[Lem[T]]
-      case _           => L1(p)
-  export core.{*, given}
-  export adder.given
-  export cons.given
-  export choicer.given
-  export cats.syntax.all.*
-  export TraverseOps.given
+import cats.syntax.all.*
+import kubrick.prelude.cmap.given
+import kubrick.prelude.lem.core.*
+object choicer:
+  trait choicer[T, S[*] <: Lem[*]]:
+    extension (a: S[T]) infix def ||(lem: Lem[T]): Choice[T]
+  given [T] => choicer[T, Choice]:
+    extension (choice: Choice[T])
+      infix def ||(lem: Lem[T]): Choice[T] = lem match
+        case c: Choice[T] => Choice[T](choice.values |+| c.values)
+        case _            => Choice[T](choice.values + (lem, L0))
+  given [T] => choicer[T, Lem]:
+    extension (lem: Lem[T])
+      infix def ||(that: Lem[T]): Choice[T] = that match
+        case c: Choice[T] => Choice[T](c.values + (lem, L0))
+        case _            => Choice[T](lem, that)
