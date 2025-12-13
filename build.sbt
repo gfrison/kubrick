@@ -1,7 +1,7 @@
 val scalaV = "3.7.4"
-ThisBuild / organization := "kubrick"
-ThisBuild / version      := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := scalaV
+ThisBuild / organization  := "kubrick"
+ThisBuild / version       := "0.1.0-SNAPSHOT"
+ThisBuild / scalaVersion  := scalaV
 ThisBuild / headerLicense := Some(HeaderLicense.MIT("2025", "Giancarlo Frison"))
 val scalaTest = "3.2.19"
 val sharedSettings = Seq(
