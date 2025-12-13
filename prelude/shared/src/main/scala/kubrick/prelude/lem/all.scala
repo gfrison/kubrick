@@ -22,6 +22,9 @@
 package kubrick.prelude.lem
 import scala.compiletime.asMatchable
 object all:
+
+  extension [T](self: Lem[T]) infix def -->[U >: T](that: Lem[U]): Pair[U] = Pair(self, that)
+
   given [T] => Conversion[T, Lem[T]] = (p: T) =>
     p.asMatchable match
       case lem: Lem[?] => lem.asInstanceOf[Lem[T]]

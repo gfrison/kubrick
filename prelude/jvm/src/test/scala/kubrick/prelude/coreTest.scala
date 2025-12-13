@@ -27,10 +27,11 @@ import kubrick.prelude.lem.*
 import kubrick.prelude.lem.all.{*, given}
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
+import scribe.*
 
 import scala.collection.immutable.ArraySeq
-
-class lem2Test extends AsyncFreeSpec with Matchers:
+class coreTest extends AsyncFreeSpec with Matchers:
+  Logger.root.withMinimumLevel(Level.Debug).replace()
   "construction" in:
     Sek(1, 2, 3) shouldBe Sek(L1(1), L1(2), L1(3))
     (Sek(1, 2) :+ 3) shouldBe Sek(1, 2, 3)
@@ -99,14 +100,12 @@ class lem2Test extends AsyncFreeSpec with Matchers:
     val lem = L1(1) + 2
     val (head, tail) = lem match
       case h + t => (h, t)
-    head shouldBe L1(1)
-    tail shouldBe new Choice(Cmap((L1(2), L0)))
+    (tail + head) shouldBe lem
   "unapply + Choice" in:
     val lem = Choice(1, 2, 3)
     val (head, tail) = lem match
       case h + t => (h, t)
-    head shouldBe L1(1)
-    tail shouldBe Choice(2, 3)
+    (head + tail) shouldBe lem
   "unapply + Sek" in:
     val lem = Sek(1, 2) + 3
     val (head, tail) = lem match

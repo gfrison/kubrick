@@ -22,10 +22,35 @@
 package kubrick.prelude
 
 object all:
+  import cats.syntax.all.*
+  import cats.*
   export lem.all.{*, given}
   export cmap.{*, given}
+  export bimap.{*, given}
+  export cset.{*, given}
+  export m2m.{*, given}
   export urn.*
   export variable.*
-  // export expr.core.{*, given}
   type Atom = Int | Float | String | Boolean
   type Term = Atom | Var
+  given Ordering[Term]:
+    def compare(x: Term, y: Term): Int = (x, y) match
+      case (a: Int, b: Int)         => a.compareTo(b)
+      case (a: Float, b: Float)     => a.compareTo(b)
+      case (a: String, b: String)   => a.compareTo(b)
+      case (a: Boolean, b: Boolean) => a.compareTo(b)
+      case (a: Int, b: Float)       => a.toFloat.compareTo(b)
+      case (a: Float, b: Int)       => a.compareTo(b.toFloat)
+      case (_: Int, _: String)      => -1
+      case (_: String, _: Int)      => 1
+      case (_: Float, _: String)    => -1
+      case (_: String, _: Float)    => 1
+      case (_: Boolean, _: String)  => -1
+      case (_: String, _: Boolean)  => 1
+      case (_: Int, _: Boolean)     => -1
+      case (_: Boolean, _: Int)     => 1
+      case (_: Float, _: Boolean)   => -1
+      case (_: Boolean, _: Float)   => 1
+      case (x: Var, y: Var)         => x.name.compareTo(y.name)
+      case (_: Atom, _: Var)        => -1
+      case (_: Var, _: Atom)        => 1

@@ -32,6 +32,11 @@ object adder:
         case Sek(sline, sdict) => new Sek(sek.line ++ sline, sdict |+| sek.dict)
         case _                 => new Sek(sek.line, sek.dict + (lem, L0))
   given [T] => adder[T, Lem[T], Choice[T]]:
-    extension (lem: Lem[T]) def +(arg: Lem[T]): Choice[T] = Choice(lem, arg)
+    extension (lem: Lem[T])
+      def +(arg: Lem[T]): Choice[T] = (lem, arg) match
+        case (sek: Sek[T], _)       => sek + arg
+        case (Choice(x), Choice(y)) => new Choice(x ++ y)
+        case (_, Choice(y))         => new Choice(y + lem)
+        case (_, _)                 => Choice(lem, arg)
   given [T] => adder[T, Choice[T], Choice[T]]:
     extension (choice: Choice[T]) def +(lem: Lem[T]): Choice[T] = Choice[T](choice.values, lem :: Nil)

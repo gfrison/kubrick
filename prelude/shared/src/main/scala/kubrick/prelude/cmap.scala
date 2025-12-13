@@ -87,6 +87,15 @@ object cmap:
     ): Eval[C] =
       fab.entries.foldRight(c):
         case ((a, b), acc) => g(b, f(a, acc))
+  given [K] => Foldable[[V] =>> Cmap[K, V]]:
+    override def foldLeft[A, B](fab: Cmap[K, A], b: B)(f: (B, A) => B): B =
+      Bifoldable[Cmap].bifoldLeft[K, A, B](fab, b)((acc, _) => acc, f)
+
+    override def foldRight[A, B](fab: Cmap[K, A], lb: Eval[B])(
+        f: (A, Eval[B]) => Eval[B]
+    ): Eval[B] =
+      Bifoldable[Cmap].bifoldRight[K, A, B](fab, lb)((_, acc) => acc, f)
+
   given Bitraverse[Cmap]:
     override def bifoldLeft[A, B, C](fab: Cmap[A, B], c: C)(f: (C, A) => C, g: (C, B) => C): C = fab.bifoldLeft(c)(f, g)
 
