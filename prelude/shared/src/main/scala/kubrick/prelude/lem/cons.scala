@@ -20,9 +20,7 @@
  */
 
 package kubrick.prelude.lem
-
-import cats.*
-import cats.syntax.all.*
+import kubrick.prelude.all.*
 import kubrick.prelude.cmap.given
 
 import core.*
@@ -49,6 +47,6 @@ object cons:
   trait merge[T, S <: Lem[T]]:
     extension (w: S) def ++(lem: S): S
   given [T] => merge[T, Choice[T]]:
-    extension (choice: Choice[T]) def ++(lem: Choice[T]): Choice[T] = Choice[T](choice.values |+| lem.values, Nil)
+    extension (choice: Choice[T]) def ++(lem: Choice[T]): Choice[T] = Choice[T](choice.values ++ lem.values, Nil)
   given [T] => merge[T, Sek[T]]:
     extension (lem: Sek[T]) def ++(that: Sek[T]): Sek[T] = new Sek(lem.line ++ that.line, lem.dict |+| that.dict)

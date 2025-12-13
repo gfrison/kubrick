@@ -20,19 +20,19 @@
  */
 
 package kubrick.prelude.lem
-import cats.syntax.all.*
-import kubrick.prelude.cmap.given
-import kubrick.prelude.lem.core.*
+import kubrick.prelude.all.*
+
+import core.*
 object choicer:
   trait choicer[T, S[*] <: Lem[*]]:
     extension (a: S[T]) infix def ||(lem: Lem[T]): Choice[T]
   given [T] => choicer[T, Choice]:
     extension (choice: Choice[T])
       infix def ||(lem: Lem[T]): Choice[T] = lem match
-        case c: Choice[T] => Choice[T](choice.values |+| c.values)
-        case _            => Choice[T](choice.values + (lem, L0))
+        case c: Choice[T] => Choice[T](choice.values ++ c.values)
+        case _            => Choice[T](choice.values + lem)
   given [T] => choicer[T, Lem]:
     extension (lem: Lem[T])
       infix def ||(that: Lem[T]): Choice[T] = that match
-        case c: Choice[T] => Choice[T](c.values + (lem, L0))
+        case c: Choice[T] => Choice[T](c.values + lem)
         case _            => Choice[T](lem, that)

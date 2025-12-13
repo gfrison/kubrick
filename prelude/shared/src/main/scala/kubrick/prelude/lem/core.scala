@@ -20,21 +20,19 @@
  */
 
 package kubrick.prelude.lem
+import kubrick.prelude.all.*
 import kubrick.prelude.cmap.*
-import scribe.*
+import kubrick.prelude.cset.{*, given}
+
 import scala.collection.immutable.ArraySeq
 object core:
-  sealed trait Lem[+T]:
-    infix def -->[U >: T](that: Lem[U]): Pair[U] = Pair(this, that)
-
-  case object L0 extends Lem[Nothing]
-
-  case class L1[+T](value: T) extends Lem[T]
-
+  sealed trait Lem[+T]
+  case object L0                                   extends Lem[Nothing]
+  case class L1[+T](value: T)                      extends Lem[T]
   case class Pair[+T](left: Lem[T], right: Lem[T]) extends Lem[T]
-
   case class Sek[+T](line: ArraySeq[Lem[T]], dict: Cmap[Lem[T], Lem[T]] = Cmap.empty) extends Lem[T]:
     export dict.{get, containsKey}
+  case class Choice[+T](values: Cset[Lem[T]]) extends Lem[T]
 
   object Sek:
     def apply[T](fst: T, snd: T, others: T*): Sek[T] = apply(ArraySeq(L1(fst), L1(snd)), Nil, others.toList.map(L1(_)))
@@ -46,22 +44,28 @@ object core:
         case Pair(l, r) :: t => apply(seq, (l, r) :: dict, t)
         case L0 :: t         => apply(seq, dict, t)
         case h :: t          => apply(seq :+ h, dict, t)
+    def apply[T](seq: ArraySeq[Lem[T]], set: Set[Lem[T]]): Sek[T] =
+      new Sek(
+        seq,
+        Cmap.from[Lem[T], Lem[T]](set.foldLeft(Map.empty) {
+          case (acc, Pair(l, r)) => acc + (l   -> r)
+          case (acc, lem)        => acc + (lem -> L0)
+        })
+      )
 
-  case class Choice[+T](values: Cmap[Lem[T], L0.type]) extends Lem[T]
   object Choice:
     def apply[T](fst: T, snd: T, others: T*): Choice[T] = others.toList match
-      case Nil    => new Choice(Cmap((L1(fst), L0), (L1(snd), L0)))
-      case h :: t => apply(Cmap((L1(fst), L0), (L1(snd), L0), (L1(h), L0)), t.map(L1(_)))
-    def apply[T](seq: Cmap[Lem[T], L0.type], others: List[Lem[T]]): Choice[T] = others.toList match
+      case Nil    => new Choice(Cset(L1(fst), L1(snd)))
+      case h :: t => apply(Cset(L1(fst), L1(snd), L1(h)), t.map(L1(_)))
+    def apply[T](seq: Cset[Lem[T]], others: List[Lem[T]]): Choice[T] = others.toList match
       case Nil    => new Choice(seq)
-      case h :: t => apply(seq + (h, L0), t)
+      case h :: t => apply(seq + h, t)
     def apply[T](fst: Lem[T], snd: Lem[T], others: List[Lem[T]]): Choice[T] = others.toList match
-      case Nil    => new Choice(Cmap((fst, L0), (snd, L0)))
-      case h :: t => apply(Cmap((fst, L0), (snd, L0), (h, L0)), t)
+      case Nil    => new Choice(Cset(fst, snd))
+      case h :: t => apply(Cset(fst, snd, h), t)
     def apply[T](fst: Lem[T], snd: Lem[T], others: Lem[T]*): Choice[T] = others.toList match
-      case Nil    => new Choice(Cmap((fst, L0), (snd, L0)))
-      case h :: t => apply(Cmap((fst, L0), (snd, L0), (h, L0)), t.toList)
-
+      case Nil    => new Choice(Cset(fst, snd))
+      case h :: t => apply(Cset(fst, snd, h), t.toList)
   object --> {
     def unapply[T](lem: Lem[T]): Option[(Lem[T], Lem[T])] = lem match
       case pair: Pair[T] => Some((pair.left, pair.right))
@@ -90,11 +94,14 @@ object core:
   object + {
     def unapply[T](lem: Lem[T]): Option[(Lem[T], Lem[T])] = lem match
       case Choice(values) =>
-        debug(s"unappling choice:$lem")
         values.headOption.map:
-          case (k: Lem[T], _) =>
-            if values.tail.nonEmpty then (k, new Choice(values.tail))
-            else (k, L0)
+          case h: Lem[T] =>
+            h -> {
+              values.tail.size match
+                case 1 => values.tail.headOption.get
+                case 0 => L0
+                case _ => new Choice(values.tail)
+            }
       case Sek[T](line, cmap) if cmap.nonEmpty =>
         cmap.headOption.map:
           case (k: Lem[T], L0) => k          -> sekTail(line, cmap.tail)
@@ -103,6 +110,6 @@ object core:
 
     private def sekTail[T](line: ArraySeq[Lem[T]], cmap: Cmap[Lem[T], Lem[T]]): Lem[T] = (line.size, cmap.size) match
       case (0, 0) => L0
-      case _ => Sek(line, cmap)
+      case _      => Sek(line, cmap)
 
   }

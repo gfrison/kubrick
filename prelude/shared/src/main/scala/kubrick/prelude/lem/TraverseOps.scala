@@ -21,8 +21,8 @@
 
 package kubrick.prelude.lem
 import cats.*
-import cats.syntax.all.*
-import kubrick.prelude.cmap.given
+import kubrick.prelude.all.*
+import kubrick.prelude.cset.Cset
 
 import core.*
 object TraverseOps:
@@ -74,14 +74,13 @@ object TraverseOps:
       )(new Sek(_, _))
 
   given Traverse[Choice]:
-    override def foldLeft[A, B](fa: Choice[A], b: B)(f: (B, A) => B): B =
-      fa.values.keys.foldLeft(b)((acc, lem) => lem.foldLeft(acc)(f))
+    override def foldLeft[A, B](fa: Choice[A], b: B)(f: (B, A) => B): B = Traverse[Cset].foldLeft(fa.values, b):
+      case (acc, lem) => lem.foldLeft(acc)(f)
     override def foldRight[A, B](fa: Choice[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
-      fa.values.keys.foldRight(lb)((lem, acc) => lem.foldRight(acc)(f))
+      Traverse[Cset].foldRight(fa.values, lb):
+        case (lem, acc) => lem.foldRight(acc)(f)
     override def traverse[G[_]: Applicative, A, B](fa: Choice[A])(f: A => G[B]): G[Choice[B]] =
-      fa.values
-        .bitraverse(
-          lem => Traverse[Lem].traverse(lem)(f),
-          _ => Applicative[G].pure(L0)
-        )
+      Traverse[Cset]
+        .traverse(fa.values):
+          case lem => Traverse[Lem].traverse(lem)(f)
         .map(new Choice(_))
