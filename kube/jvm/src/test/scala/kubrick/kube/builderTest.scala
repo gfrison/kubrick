@@ -33,7 +33,7 @@ class builderTest extends AsyncFreeSpec with Matchers:
     kube.seqs.size shouldBe 1
     kube.seqs(0).getRight("a") should not be empty
   "sek1 (a,b,c)" in:
-    val sek = Sek("a", "b", "c")
+    val sek  = Sek("a", "b", "c")
     val kube = K0 + Sek("a", "b", "c")
     kube.seqs should have size 3
     kube.seqs(0).containsLeft("a") shouldBe true
@@ -103,3 +103,8 @@ class builderTest extends AsyncFreeSpec with Matchers:
     kube.vals.left should have size 1
     kube.seqs should have size 2
     kube.roots should have size 1
+
+  "sek choice" in:
+    val d = Sek("a","b") + Choice("c","d")
+    val kube = K0 + d
+    kube.sets shouldBe empty

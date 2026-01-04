@@ -51,7 +51,7 @@ object builder:
     def doSek(sek: Sek[Term], id: Kid)(using next: Sequencer): Builder = sek match
       case Sek(ArraySeq(), dict)           => doMap(dict, id)
       case Sek(line, dict) if dict.isEmpty => doLine(line, id)
-      case Sek(line, dict)                 => doLine(line, id).doMap(sek.dict, id)
+      case Sek(line, dict)                 => doLine(line, id).doMap(dict, id)
 
     def doLine(line: ArraySeq[Doc], id: Kid)(using next: Sequencer): Builder =
       line.zipWithIndex.foldLeft(this):
@@ -63,9 +63,9 @@ object builder:
     def doMap(set: Cmap[Doc, Doc], parent: Kid)(using next: Sequencer): Builder =
       set.entries
         .foldLeft(this):
-          case (acc, (doc, L0))    => acc.doSet(doc, parent)
-          case (acc, (key, value)) => acc.doSet(Pair(key, value), parent)
-        .add(parent, Sets)
+          case (acc, (Choice[Term](cset), L0)) => acc.doChoice(cset, parent)
+          case (acc, (doc, L0))                => acc.doSet(doc, parent).add(parent, Sets)
+          case (acc, (key, value))             => acc.doSet(Pair(key, value), parent).add(parent, Sets)
 
     def doChoice(alt: Cset[Doc], parent: Kid)(using next: Sequencer): Builder = alt.foldLeft(this):
       case (acc, doc) => acc.doSet(doc, parent)

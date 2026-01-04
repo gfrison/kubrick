@@ -49,6 +49,6 @@ object all:
       (Builder(seqs, keys, vals, roots, sets) + doc) match
         case Builder(bSeqs, bKeys, bVals, bRoots, bSets) => Kube(bSeqs, bKeys, bVals, bRoots, bSets)
 
-    def get(id: Kid): Doc = revit.Revit(seqs, keys, vals).get(id)
+    def get(id: Kid): Option[Doc] = revit.Revit(seqs, keys, vals, sets).get(id)
 
     def search(query: Doc): LazyList[Doc] = ???

@@ -30,23 +30,63 @@ object revit:
   case class Revit(
       seqs: ArraySeq[Bi],
       keys: Bi = bi0,
-      vals: Bi = bi0
+      vals: Bi = bi0,
+      sets: Set[Kid]
   ):
-    def get(id: Kid): Lem[Term] =
-      val lseq = seqs.foldLeft(ArraySeq.empty[Doc]):
-        case (acc, bi) =>
+    def get(id: Kid): Option[Doc] =
+      val (_, lseq) = seqs.foldLeft(true -> ArraySeq.empty[Doc]):
+        case (true -> acc, bi) =>
           bi.getLeft(id) match
-            case set if set.isEmpty => acc
+            case set if set.isEmpty => false -> ArraySeq.empty
             case set if set.size == 1 =>
-              set.head match
-                case t: Term => acc :+ L1(t)
-                case k: Kid  => acc :+ get(k)
+              true -> {
+                set.head match
+                  case t: Term => acc :+ L1(t)
+                  case k: Kid  => get(k).map(acc :+ _).getOrElse(acc)
+              }
+            case set => // choices
+              val ms = set.map:
+                case t: Term => L1(t)
+                case k: Kid  => get(k).getOrElse(L0)
+              if ms.tail.size == 1 then true -> (acc :+ Choice(ms.head, ms.tail.head))
+              else true                      -> (acc :+ Choice(ms.head, ms.tail.head, ms.tail.tail.toSeq*))
+        case _ => false -> ArraySeq.empty
+
       (lseq, keys.getLeft(id)) match
-        case ArraySeq() -> set if set.isEmpty             => L0
-        case ArraySeq() -> set                            => L0
-        case ArraySeq(l1: L1[Term]) -> set if set.isEmpty => l1
+        case ArraySeq() -> set if set.isEmpty => None
+        case ArraySeq() -> set                => fromKey(sets.contains(id), set, fromValue(vals.getLeft(id)))
+        case ArraySeq(l1: L1[Term]) -> set if set.isEmpty => Some(l1)
         case _ -> set =>
-          val els = set.map:
-            case k: Kid  => get(k)
-            case t: Term => L1(t)
-          Sek[Term](lseq, els)
+          Some:
+            val els = set
+              .map:
+                case k: Kid  => get(k)
+                case t: Term => Some(L1(t))
+              .flatten
+            Sek.from[Term](lseq, els)
+
+    def fromKey(isSet: Boolean, idKeys: Set[Term | Kid], idVals: Option[Doc]): Option[Doc] =
+      val al = idKeys.map:
+        case t: Term => L1(t)
+        case k: Kid  => get(k).getOrElse(L0)
+      if al.isEmpty then None
+      else
+        Some:
+          val el = {
+            if isSet then Sek.from(ArraySeq.empty, al)
+            else if al.size == 1 then al.head
+            else Choice.from(al.toList)
+          }
+          idVals match
+            case Some(v) => Pair(el, v)
+            case None    => el
+
+    def fromValue(idVals: Set[Term | Kid]): Option[Doc] =
+      val al = idVals.map:
+        case t: Term => L1(t)
+        case k: Kid  => get(k).getOrElse(L0)
+      if al.isEmpty then None
+      else
+        Some:
+          if al.size == 1 then al.head
+          else Choice(al.head, al.tail.head, al.tail.tail.toSeq*)
