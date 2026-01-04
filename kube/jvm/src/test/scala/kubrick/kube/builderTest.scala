@@ -105,6 +105,6 @@ class builderTest extends AsyncFreeSpec with Matchers:
     kube.roots should have size 1
 
   "sek choice" in:
-    val d = Sek("a","b") + Choice("c","d")
+    val d    = Sek("a", "b") + Choice("c", "d")
     val kube = K0 + d
     kube.sets shouldBe empty

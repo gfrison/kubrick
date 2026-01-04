@@ -17,7 +17,7 @@ class buildRevitTest extends AsyncFreeSpec with Matchers:
   "choice" in:
     single(Choice("a", "b", "c"))
   "sek choice" in:
-    single(Sek("a","b") + Choice("c","d"))
+    single(Sek("a", "b") + Choice("c", "d"))
   def single(doc: Doc) =
     debug(s"doc: $doc")
     val k = K0 + doc
