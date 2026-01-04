@@ -32,6 +32,6 @@ object all:
   export core.{*, given}
   export adder.given
   export cons.given
-  export choicer.given
+  export choicer.{*, given}
   export cats.syntax.all.*
   export TraverseOps.given

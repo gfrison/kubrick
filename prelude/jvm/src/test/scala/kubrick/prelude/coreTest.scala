@@ -38,7 +38,7 @@ class coreTest extends AsyncFreeSpec with Matchers:
     (1 +: Sek(2, 3)) shouldBe Sek(1, 2, 3)
     Sek(1, 2) + 3 shouldBe new Sek(ArraySeq(L1(1), L1(2)), Cmap((L1(3), L0)))
     Sek(1, 2) ++ Sek(3, 4) shouldBe new Sek(ArraySeq(L1(1), L1(2), L1(3), L1(4)))
-    L1(1) + L1(2) shouldBe Choice(L1(1), L1(2))
+    L1(1) + L1(2) shouldBe Sek.from(ArraySeq.empty, Set(L1(1), L1(2)))
     1 --> 2 shouldBe Pair(L1(1), L1(2))
     ((1 --> 2) +: 3 +: L0) shouldBe Sek(Pair(L1(1), L1(2)), L1(3))
     (((1 --> 2) :+ 3) + 4) shouldBe new Sek(ArraySeq(L1(3)), Cmap.from(Map((L1(1), L1(2)), (L1(4), L0))))

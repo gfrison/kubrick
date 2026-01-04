@@ -36,6 +36,9 @@ object m2m:
       case M2m(a, b) => M2m(MultiDict.from(left.toSeq ++ a.toSeq), MultiDict.from(right.toSeq ++ b.toSeq))
   object M2m:
     def empty[L, R]: M2m[L, R] = M2m(MultiDict.empty, MultiDict.empty)
+    def apply[L, R](pairs: (L, R)*): M2m[L, R] =
+      pairs.foldLeft(empty[L, R]):
+        case (acc, (l, r)) => acc + (l -> r)
   given Bifunctor[M2m]:
     def bimap[A, B, C, D](fab: M2m[A, B])(f: A => C, g: B => D): M2m[C, D] = fab match
       case M2m(left, right) => M2m(left.map((a, b) => f(a) -> g(b)), right.map((b, a) => (g(b), f(a))))

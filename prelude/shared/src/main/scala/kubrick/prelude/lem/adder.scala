@@ -21,6 +21,8 @@
 
 package kubrick.prelude.lem
 import kubrick.prelude.lem.all.*
+
+import scala.collection.immutable.ArraySeq
 object adder:
   trait adder[T, W <: Lem[T], S <: Lem[T]]:
     extension (w: W) def +(lem: Lem[T]): S
@@ -31,12 +33,15 @@ object adder:
         case Pair(left, right) => sek.copy(dict = sek.dict + (left, right))
         case Sek(sline, sdict) => new Sek(sek.line ++ sline, sdict |+| sek.dict)
         case _                 => new Sek(sek.line, sek.dict + (lem, L0))
-  given [T] => adder[T, Lem[T], Choice[T]]:
+  given [T] => adder[T, Lem[T], Lem[T]]:
     extension (lem: Lem[T])
-      def +(arg: Lem[T]): Choice[T] = (lem, arg) match
-        case (sek: Sek[T], _)       => sek + arg
-        case (Choice(x), Choice(y)) => new Choice(x ++ y)
-        case (_, Choice(y))         => new Choice(y + lem)
-        case (_, _)                 => Choice(lem, arg)
+      def +(arg: Lem[T]): Lem[T] = (lem, arg) match
+        case (Sek[T](l1, s1), Sek(l2, s2)) => Sek(l1 |+| l2, s1 |+| s2)
+        case (Sek[T](line, set), _)        => Sek(line, set + (arg, L0))
+        case (Choice(x), Choice(y))        => new Choice(x ++ y)
+        case (_, Choice(y))                => new Choice(y + lem)
+        case (L0, _)                       => arg
+        case (_, L0)                       => lem
+        case (_, _)                        => Sek.from(ArraySeq.empty, Set(lem, arg))
   given [T] => adder[T, Choice[T], Choice[T]]:
     extension (choice: Choice[T]) def +(lem: Lem[T]): Choice[T] = Choice[T](choice.values, lem :: Nil)

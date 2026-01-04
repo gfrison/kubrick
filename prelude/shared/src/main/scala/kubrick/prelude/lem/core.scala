@@ -20,11 +20,14 @@
  */
 
 package kubrick.prelude.lem
-import kubrick.prelude.all.*
+import cats.syntax.all.*
 import kubrick.prelude.cmap.*
 import kubrick.prelude.cset.{*, given}
 
 import scala.collection.immutable.ArraySeq
+import scala.util.NotGiven
+
+import choicer.{*, given}
 object core:
   sealed trait Lem[+T]
   case object L0                                   extends Lem[Nothing]
@@ -44,7 +47,7 @@ object core:
         case Pair(l, r) :: t => apply(seq, (l, r) :: dict, t)
         case L0 :: t         => apply(seq, dict, t)
         case h :: t          => apply(seq :+ h, dict, t)
-    def apply[T](seq: ArraySeq[Lem[T]], set: Set[Lem[T]]): Sek[T] =
+    def from[T](seq: ArraySeq[Lem[T]], set: Set[Lem[T]]): Sek[T] =
       new Sek(
         seq,
         Cmap.from[Lem[T], Lem[T]](set.foldLeft(Map.empty) {
@@ -54,9 +57,9 @@ object core:
       )
 
   object Choice:
-    def apply[T](fst: T, snd: T, others: T*): Choice[T] = others.toList match
-      case Nil    => new Choice(Cset(L1(fst), L1(snd)))
-      case h :: t => apply(Cset(L1(fst), L1(snd), L1(h)), t.map(L1(_)))
+    def apply[T](fst: T, snd: T, others: T*)(using NotGiven[T =:= Lem[?]]): Choice[T] =
+      (new Choice[T](Cset(L1(fst), L1(snd)))) || from(others.map(L1(_)).toList)
+
     def apply[T](seq: Cset[Lem[T]], others: List[Lem[T]]): Choice[T] = others.toList match
       case Nil    => new Choice(seq)
       case h :: t => apply(seq + h, t)
@@ -66,6 +69,11 @@ object core:
     def apply[T](fst: Lem[T], snd: Lem[T], others: Lem[T]*): Choice[T] = others.toList match
       case Nil    => new Choice(Cset(fst, snd))
       case h :: t => apply(Cset(fst, snd, h), t.toList)
+    def from[T](ls: List[Lem[T]]): Lem[T] = ls match
+      case Nil      => L0
+      case h :: Nil => h
+      case h :: t   => h || from(t)
+
   object --> {
     def unapply[T](lem: Lem[T]): Option[(Lem[T], Lem[T])] = lem match
       case pair: Pair[T] => Some((pair.left, pair.right))
