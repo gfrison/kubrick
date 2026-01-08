@@ -27,7 +27,7 @@ import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
 
 import cmap.{*, given}
-class CmapTest extends AsyncFreeSpec with Matchers:
+class cmapTest extends AsyncFreeSpec with Matchers:
   "empty" in:
     Cmap.empty[Int, String] shouldBe Cmap.empty[Int, String]
   "new" in:
@@ -48,3 +48,9 @@ class CmapTest extends AsyncFreeSpec with Matchers:
     val cmap   = Cmap(1 -> "one", 2 -> "two")
     val result = Bifunctor[Cmap].bimap(cmap)(_.toString, _.length)
     result shouldBe Cmap("1" -> 3, "2" -> 3)
+  "from" in:
+    val cmap = Cmap.from(Map(1 -> "one", 2 -> "two"))
+    cmap shouldBe new Cmap(Map(1 -> "one", 2 -> "two"))
+  "equality" in:
+    new Cmap(Map("one" -> 1, "two" -> 2)) shouldBe new Cmap(List("one" -> 1, "two" -> 2))
+    Cmap.from(Map("one" -> 1, "two" -> 2)) shouldBe new Cmap(List("one" -> 1, "two" -> 2))

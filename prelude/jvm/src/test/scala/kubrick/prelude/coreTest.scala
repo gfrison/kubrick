@@ -122,3 +122,14 @@ class coreTest extends AsyncFreeSpec with Matchers:
       case h + t => (h, t)
     head shouldBe (3 --> 4)
     tail shouldBe Sek(1, 2)
+  "Sek.from" in:
+    val sek = Sek.from(ArraySeq(L1(1), L1(2)), Set(Choice(3, 4)))
+    sek.line shouldBe ArraySeq(L1(1), L1(2))
+    sek.dict shouldBe new Cmap(Map(Choice(3, 4) -> L0))
+  "choice factory" in:
+    Choice(2, 3).values.size shouldBe 2
+    Choice(1, 2, 3).values.size shouldBe 3
+  "sek + choice" in:
+    val sek = Sek(1, 2) + Choice(3, 4)
+    sek.line shouldBe ArraySeq(L1(1), L1(2))
+    sek.dict shouldBe new Cmap(Map(Choice(3, 4) -> L0))

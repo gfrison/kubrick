@@ -22,7 +22,7 @@
 package kubrick.prelude.lem
 import kubrick.prelude.all.*
 import kubrick.prelude.lem.core.L0
-
+import scribe.*
 import core.*
 object choicer:
   extension [T, S[*] <: Lem[*]](c: S[T])(using cho: choicer[T, S]) infix def ||(lem: Lem[T]): S[T] = cho.or(c, lem)
@@ -30,10 +30,13 @@ object choicer:
     def or(a: S[T], other: Lem[T]): S[T]
   given ch: [T] => choicer[T, Choice]:
     def or(choice: Choice[T], other: Lem[T]): Choice[T] = other match
+      case L0           => choice
       case c: Choice[T] => Choice[T](choice.values ++ c.values)
       case _            => Choice[T](choice.values + other)
   given [T] => choicer[T, Lem]:
-    def or(lem: Lem[T], that: Lem[T]): Lem[T] = (that, lem) match
-      case _ -> L0             => that
-      case (c: Choice[T]) -> _ => ch.or(c, lem)
-      case _ -> _              => Choice[T](lem, that)
+    def or(lem: Lem[T], that: Lem[T]): Lem[T] =
+      (that, lem) match
+        case _ -> L0             => that
+        case L0 -> _             => lem
+        case (c: Choice[T]) -> _ => ch.or(c, lem)
+        case _ -> _              => Choice[T](lem, that)
