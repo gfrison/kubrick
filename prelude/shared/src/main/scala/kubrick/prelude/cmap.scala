@@ -31,9 +31,10 @@ object cmap:
 
   case class Cmap[+K, +V](entries: Iterable[(K, V)]):
     export entries.{size, isEmpty, nonEmpty}
-    def tail: Cmap[K, V]           = Cmap(entries.tail)
-    def head: (K, V)               = entries.head
-    def headOption: Option[(K, V)] = entries.headOption
+    def tail: Cmap[K, V]                                     = Cmap(entries.tail)
+    def head: (K, V)                                         = entries.head
+    def headOption: Option[(K, V)]                           = entries.headOption
+    def ++[S >: K, VV >: V](other: Cmap[S, VV]): Cmap[S, VV] = Cmap(entries ++ other.entries)
     private lazy val hashes = entries.foldLeft(IntMap.empty[Seq[(K, V)]]):
       case (acc, kvals) =>
         acc.updated(
@@ -68,6 +69,8 @@ object cmap:
     def apply[K, V](entries: (K, V)*): Cmap[K, V] = new Cmap(entries)
 
     def from[K, V](map: Map[K, V]): Cmap[K, V] = new Cmap(map)
+
+    def unapplySeq[K, V](cm: Cmap[K, V]): Option[Iterable[(K, V)]] = Some(cm.entries)
 
   given Bifunctor[Cmap]:
     def bimap[A, B, C, D](cmap: Cmap[A, B])(f: A => C, g: B => D): Cmap[C, D] =

@@ -22,7 +22,7 @@
 package kubrick.prelude.lem
 import kubrick.prelude.all.*
 import kubrick.prelude.lem.core.L0
-import scribe.*
+
 import core.*
 object choicer:
   extension [T, S[*] <: Lem[*]](c: S[T])(using cho: choicer[T, S]) infix def ||(lem: Lem[T]): S[T] = cho.or(c, lem)

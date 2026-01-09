@@ -30,18 +30,17 @@ import org.scalatest.matchers.should.Matchers
 import scribe.*
 
 import scala.collection.immutable.ArraySeq
-class coreTest extends AsyncFreeSpec with Matchers:
+class lemTest extends AsyncFreeSpec with Matchers:
   Logger.root.withMinimumLevel(Level.Debug).replace()
   "construction" in:
     Sek(1, 2, 3) shouldBe Sek(L1(1), L1(2), L1(3))
     (Sek(1, 2) :+ 3) shouldBe Sek(1, 2, 3)
     (1 +: Sek(2, 3)) shouldBe Sek(1, 2, 3)
-    Sek(1, 2) + 3 shouldBe new Sek(ArraySeq(L1(1), L1(2)), Cmap((L1(3), L0)))
+    (Sek(1, 2) + L1(3)) shouldBe Bag(Sek(1, 2), L1(3)) // vnew Sek(ArraySeq(L1(1), L1(2)), Cmap((L1(3), L0)))
     Sek(1, 2) ++ Sek(3, 4) shouldBe new Sek(ArraySeq(L1(1), L1(2), L1(3), L1(4)))
-    L1(1) + L1(2) shouldBe Sek.from(ArraySeq.empty, Set(L1(1), L1(2)))
+    (L1(1) + L1(2)) shouldBe Bag(1, 2)
     1 --> 2 shouldBe Pair(L1(1), L1(2))
-    ((1 --> 2) +: 3 +: L0) shouldBe Sek(Pair(L1(1), L1(2)), L1(3))
-    (((1 --> 2) :+ 3) + 4) shouldBe new Sek(ArraySeq(L1(3)), Cmap.from(Map((L1(1), L1(2)), (L1(4), L0))))
+    (((1 --> 2) :+ 3) + L1(4)) shouldBe Bag(L1(4), new Sek(ArraySeq(L1(3)), Cmap.from(Map((L1(1), L1(2))))))
   "map aggregate" in:
     L1(10).map(_ + 1) shouldBe L1(11)
     Pair(L1(1), L1(2)).map(_ + 1) shouldBe Pair(L1(2), L1(3))
@@ -68,10 +67,10 @@ class coreTest extends AsyncFreeSpec with Matchers:
     p2.traverse(_ => None) shouldBe None
 
   "Sek.exists and containsKey" in:
-    val sek = Sek(1, 2, 3) + 12
+    val sek = Sek(1, 2, 3) + L1(12)
     sek.exists(_ == 12) shouldBe true
     sek.exists(_ == 42) shouldBe false
-    val s2 = Sek(L1(1), L1(2)) + 3 + (100 --> 200)
+    val s2 = Sek(L1(1), L1(2)) + L1(3) + (L1(100) --> L1(200))
     s2.containsKey(L1(3)) shouldBe true
     s2.containsKey(L1(99)) shouldBe false
     s2.get(L1(100)) shouldBe Some(L1(200))
@@ -97,17 +96,17 @@ class coreTest extends AsyncFreeSpec with Matchers:
     left shouldBe L1(1)
     right shouldBe L1(2)
   "unapply + L1" in:
-    val lem = L1(1) + 2
-    val (head, tail) = lem match
-      case h + t => (h, t)
-    (tail + head) shouldBe lem
-  "unapply + Choice" in:
-    val lem = Choice(1, 2, 3)
+    val lem = L1(1) + L1(2)
     val (head, tail) = lem match
       case h + t => (h, t)
     (head + tail) shouldBe lem
+  "unapply + Choice" in:
+    val lem = Choice(1, 2, 3)
+    val (head, tail) = lem match
+      case h || t => (h, t)
+    (head || tail) shouldBe lem
   "unapply + Sek" in:
-    val lem = Sek(1, 2) + 3
+    val lem = Sek(1, 2) + L1(3)
     val (head, tail) = lem match
       case h + t => (h, t)
     head shouldBe L1(3)
@@ -122,14 +121,6 @@ class coreTest extends AsyncFreeSpec with Matchers:
       case h + t => (h, t)
     head shouldBe (3 --> 4)
     tail shouldBe Sek(1, 2)
-  "Sek.from" in:
-    val sek = Sek.from(ArraySeq(L1(1), L1(2)), Set(Choice(3, 4)))
-    sek.line shouldBe ArraySeq(L1(1), L1(2))
-    sek.dict shouldBe new Cmap(Map(Choice(3, 4) -> L0))
   "choice factory" in:
     Choice(2, 3).values.size shouldBe 2
     Choice(1, 2, 3).values.size shouldBe 3
-  "sek + choice" in:
-    val sek = Sek(1, 2) + Choice(3, 4)
-    sek.line shouldBe ArraySeq(L1(1), L1(2))
-    sek.dict shouldBe new Cmap(Map(Choice(3, 4) -> L0))
