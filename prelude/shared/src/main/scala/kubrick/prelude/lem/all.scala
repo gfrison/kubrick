@@ -30,7 +30,7 @@ object all:
       case lem: NLem[?] => lem.asInstanceOf[NLem[T]]
       case _            => L1(p)
   export core.{*, given}
-  export Plus.{*, given}
+  export IPlus.{*, given}
   export cons.given
   export choicer.{*, given}
   export cats.syntax.all.*
