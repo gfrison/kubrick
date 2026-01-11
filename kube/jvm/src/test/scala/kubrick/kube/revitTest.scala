@@ -8,7 +8,7 @@ import scribe.*
 
 import scala.collection.immutable.ArraySeq
 class revitTest extends AsyncFreeSpec with Matchers:
-  Logger.root.withMinimumLevel(Level.Debug).replace()
+  Logger.root.withMinimumLevel(Level.Trace).replace()
   "simple sek" in:
     val k = Kube(
       seqs = ArraySeq(M2m("a" -> Kid(1)), M2m("b" -> Kid(1))),
@@ -56,3 +56,12 @@ class revitTest extends AsyncFreeSpec with Matchers:
       roots = Set(Kid(2))
     )
     k.get(Kid(2)) should contain(Pair(L1("a"), L1("b")))
+  "sek + choice" in:
+    val k = Kube(
+      seqs = ArraySeq(M2m("a" -> Kid(1)), M2m("b" -> Kid(1))),
+      keys = M2m("c" -> Kid(1), "d" -> Kid(1)),
+      roots = Set(Kid(1))
+    )
+    val sek = Sek("a", "b") + Choice("c", "d")
+    debug { s"Expected sek: $sek" }
+    k.get(Kid(1)) should contain(sek)

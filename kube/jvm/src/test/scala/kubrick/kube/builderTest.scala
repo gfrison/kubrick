@@ -55,6 +55,16 @@ class builderTest extends AsyncFreeSpec with Matchers:
     kube.sets should have size 1
     kube.keys.left.size shouldBe 1
     kube.roots should contain(kube.keys.getRight("d").head)
+  "sek + choice" in:
+    val kube = K0 + (Sek("a", "c") + Choice("d", "f"))
+    kube.seqs should have size 2
+    kube.roots should have size 1
+    kube.sets shouldBe empty
+    kube.keys.left.size shouldBe 2
+    kube.keys.left.keySet should contain only("d", "f")
+    val idc = kube.keys.left.values.toSet
+    idc should have size 1
+    idc.head shouldBe kube.roots.head
   "seq + pair" in:
     val kube = K0 + (Sek(L1("a"), Sek("b", "c")) + ("d" --> "f"))
     kube.seqs should have size 2

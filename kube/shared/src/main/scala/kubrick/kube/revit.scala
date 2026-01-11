@@ -25,6 +25,7 @@ import kubrick.prelude.all.*
 import scala.collection.immutable.*
 
 import all.*
+import scribe.*
 
 object revit:
   case class Revit(
@@ -34,6 +35,7 @@ object revit:
       sets: Set[Kid]
   ):
     def get(id: Kid): Option[Doc] =
+      debug { s"get id=$id" }
       val (_, lseq) = seqs.foldLeft(true -> ArraySeq.empty[Doc]):
         case (true -> acc, bi) =>
           bi.getLeft(id) match
@@ -53,9 +55,9 @@ object revit:
         case _ => false -> ArraySeq.empty
 
       (lseq, keys.getLeft(id)) match
-        case ArraySeq() -> set if set.isEmpty => None
-        case ArraySeq() -> set                => fromKey(sets.contains(id), set, fromValue(vals.getLeft(id)))
         case ArraySeq(l1: L1[Term]) -> set if set.isEmpty => Some(l1)
+        case ArraySeq() -> set if set.isEmpty             => None
+        case ArraySeq() -> set                            => fromKey(id, set)
         case _ -> set =>
           Some:
             val els = set
@@ -63,9 +65,12 @@ object revit:
                 case k: Kid  => get(k)
                 case t: Term => Some(L1(t))
               .flatten
-            Sek.from[Term](lseq, els)
+            Sek.from[Term](lseq, fromKey(id, set).toSet)
 
-    def fromKey(isSet: Boolean, idKeys: Set[Term | Kid], idVals: Option[Doc]): Option[Doc] =
+    def fromKey(id: Kid, idKeys: Set[Term | Kid]): Option[Doc] =
+      val idVals = fromValue(vals.getLeft(id))
+      val isSet  = sets.contains(id)
+      debug { s"fromKey isSet=$isSet idKeys=$idKeys idVals=$idVals" }
       val al = idKeys.map:
         case t: Term => L1(t)
         case k: Kid  => get(k).getOrElse(L0)
