@@ -21,17 +21,11 @@
 
 package kubrick.prelude.lem
 import scala.compiletime.asMatchable
+import core.*
 object all:
-
-  extension [T](self: NLem[T]) infix def -->[U >: T](that: NLem[U]): Pair[U] = Pair(self, that)
-
-  given [T] => Conversion[T, NLem[T]] = (p: T) =>
-    p.asMatchable match
-      case lem: NLem[?] => lem.asInstanceOf[NLem[T]]
-      case _            => L1(p)
   export core.{*, given}
-  export IPlus.{*, given}
-  export cons.given
-  export choicer.{*, given}
+  // export cons.given
+  // export choicer.{*, given}
+  // export iget.{*, given}
+  export plus.{*, given}
   export cats.syntax.all.*
-  export TraverseOps.given

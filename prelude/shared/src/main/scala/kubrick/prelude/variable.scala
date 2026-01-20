@@ -20,8 +20,8 @@
  */
 
 package kubrick.prelude
+import kubrick.prelude.variable.VarXind.*
 object variable:
-  import VarXind.*
   trait Var extends AnyVar:
     val name: String
   object Lvar:

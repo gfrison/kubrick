@@ -20,15 +20,16 @@
  */
 
 package kubrick.prelude
-
+import variable.*
+import cats.syntax.all.*
+import cats.*
 object all:
-  import cats.syntax.all.*
-  import cats.*
+  export traits.{*, given}
   export lem.all.{*, given}
-  export cmap.{*, given}
-  export bimap.{*, given}
-  export cset.{*, given}
-  export m2m.{*, given}
+  // export bimap.{*, given}
+  export kset.{*, given}
+  export kmap.{*, given}
+  // export m2m.{*, given}
   export urn.*
   export variable.*
   type Atom = Int | Float | String | Boolean

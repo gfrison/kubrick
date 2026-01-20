@@ -62,11 +62,11 @@ object TraverseOps:
     def traverse[F[_]: Applicative, A, B](fa: L1[A])(f: A => F[B]): F[L1[B]]                  = f(fa.value).map(L1(_))
 
   given Traverse[Pair]:
-    override def foldLeft[A, B](fa: Pair[A], b: B)(f: (B, A) => B): B = fa.right.foldLeft(fa.left.foldLeft(b)(f))(f)
+    override def foldLeft[A, B](fa: Pair[A], b: B)(f: (B, A) => B): B = fa.value.foldLeft(fa.key.foldLeft(b)(f))(f)
     override def foldRight[A, B](fa: Pair[A], lb: Eval[B])(f: (A, Eval[B]) => Eval[B]): Eval[B] =
-      fa.left.foldRight(fa.right.foldRight(lb)(f))(f)
+      fa.key.foldRight(fa.value.foldRight(lb)(f))(f)
     override def traverse[G[_]: Applicative, A, B](fa: Pair[A])(f: A => G[B]): G[Pair[B]] =
-      Applicative[G].map2(fa.left.traverse(f), fa.right.traverse(f))(new Pair(_, _))
+      Applicative[G].map2(fa.key.traverse(f), fa.value.traverse(f))(new Pair(_, _))
 
   given Traverse[Sek]:
     override def foldLeft[A, B](fa: Sek[A], b: B)(f: (B, A) => B): B =

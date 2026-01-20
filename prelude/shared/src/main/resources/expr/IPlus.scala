@@ -23,21 +23,10 @@ package kubrick.prelude.lem
 import kubrick.prelude.lem.all.*
 
 object IPlus:
-  /** add elements to an aggregate.
-    *
-    * specify argument type (I) and output type (Out) to resolve ambiguities.
-    */
-  trait IPlus[F[_], I[_]]:
-    type Out[_]
-    def plus[T](a: F[T], b: I[T]): Out[T]
-
-  extension [F[_], I[_], T](a: F[T])
-    def +[O[_]](b: I[T])(using p: IPlus[F, I] { type Out[X] = O[X] }): O[T] =
-      p.plus(a, b)
 
   given [T] => IPlus[Sek, Pair]:
     type Out[X] = Sek[X]
-    def plus[T](a: Sek[T], b: Pair[T]): Sek[T] = a.copy(pairs = a.pairs + (b.left, b.right))
+    def plus[T](a: Sek[T], b: Pair[T]): Sek[T] = a.copy(pairs = a.pairs + (b.key, b.value))
 
   given [T] => IPlus[Sek, L1]:
     type Out[X] = Bag[X]
@@ -53,7 +42,7 @@ object IPlus:
 
   given [T] => IPlus[Bag, Pair]:
     type Out[X] = Bag[X]
-    def plus[T](a: Bag[T], b: Pair[T]): Bag[T] = a.copy(pairs = a.pairs + (b.left, b.right))
+    def plus[T](a: Bag[T], b: Pair[T]): Bag[T] = a.copy(pairs = a.pairs + (b.key, b.value))
 
   given [T] => IPlus[Bag, NLem]:
     type Out[X] = Bag[X]
