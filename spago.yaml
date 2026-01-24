@@ -1,0 +1,21 @@
+package:
+  name: kubrick
+  dependencies:
+    - aff
+    - arrays
+    - console
+    - debug
+    - effect
+    - lists
+    - ordered-collections
+    - prelude
+    - spec
+    - spec-node
+    - unordered-collections
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 71.0.0
+  extraPackages: {}
