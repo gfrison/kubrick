@@ -6,7 +6,7 @@ import Data.List as List
 import Data.List.Types (List(..))
 import Data.String as String
 import Data.Tuple.Nested ((/\))
-import Lem (Bag1, Dict1, Lem(..), Sek1, (<+), (<+>), (:::))
+import Kubrick.Lem (Bag1, Dict1, Lem(..), Sek1, (<+), (<+>), (:::))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldSatisfy)
 

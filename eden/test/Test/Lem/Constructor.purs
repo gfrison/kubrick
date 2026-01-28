@@ -6,7 +6,7 @@ import Data.List ((:))
 import Data.List.Types (List(..))
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Lem (Lem(..), lem, (:::), (<+>))
+import Kubrick.Lem (Lem(..), lem, (:::), (<+>), (+:))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -23,6 +23,9 @@ spec = do
         result `shouldEqual` L1 "hello"
 
     describe "lem for sequences (List)" do
+      -- it "seks of seks" do
+      --  let result = lem(1:2:Nil) ::: lem(3:4:Nil)
+      --  result `shouldEqual` Sek (Sek (L1 1) (L1 2) Nil) (Sek (L1 3) (L1 4) Nil) Nil
       it "lem (1 : 2 : 3 : Nil) => Sek" do
         let result = lem (1 : 2 : 3 : Nil)
         result `shouldEqual` Sek (L1 1) (L1 2) (L1 3 : Nil)

@@ -4,8 +4,8 @@ import Prelude
 
 import Data.List ((:))
 import Data.List.Types (List(..))
-import Lem (Lem(..))
-import Lem as Lem
+import Kubrick.Lem (Lem(..))
+import Kubrick.Lem as Lem
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 

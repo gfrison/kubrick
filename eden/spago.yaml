@@ -1,0 +1,23 @@
+package:
+  name: kubrick-eden
+  dependencies:
+    - arrays
+    - console
+    - effect
+    - foldable-traversable
+    - lists
+    - maybe
+    - ordered-collections
+    - prelude
+    - transformers
+    - tuples
+    - unordered-collections
+  test:
+    main: Test.Eden.Main
+    dependencies:
+      - aff
+      - spec
+      - spec-node
+  publish:
+    version: 0.1.0
+    license: MIT

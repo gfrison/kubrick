@@ -1,5 +1,5 @@
-module Lem
-  ( -- * Operators (recommended API)
+module Kubrick.Lem
+  ( -- * Operators (recommended API - USE THESE)
     (<+)
   , (<+>)
   , (+:)
@@ -8,10 +8,6 @@ module Lem
   -- * Types
   -- | Note: Sekdict and Bagdict are created by operators, not by users directly
   , Lem(..)
-  -- | Opaque types - use operators or smart constructors to create
-  , Sek1
-  , Bag1
-  , Dict1
   -- * Type Classes
   , class AddPrimitive
   , addPrimitive
@@ -23,14 +19,17 @@ module Lem
   , prep
   , class PostPrimitive
   , post
-  -- * Smart Constructors (ensure uniqueness)
+  -- * Polymorphic Constructor
+  , class MakeLem
+  , lem
+  -- * INTERNAL - Do not use directly (exported for Builder access only)
+  , Sek1(..)
+  , Bag1(..)
+  , Dict1(..)
   , bag
   , choice
   , dict
   , d2
-  -- * Polymorphic Constructor
-  , class MakeLem
-  , lem
   ) where
 
 -- * Imports

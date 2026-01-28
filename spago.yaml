@@ -1,17 +1,17 @@
 package:
   name: kubrick
+  publish:
+    version: 0.1.0
+    license: MIT
+    location:
+      githubOwner: gfrison
+      githubRepo: kubrick
   dependencies:
-    - aff
-    - arrays
     - console
-    - debug
     - effect
-    - lists
-    - ordered-collections
+    - kubrick-eden
+    - kubrick-kube
     - prelude
-    - spec
-    - spec-node
-    - unordered-collections
   test:
     main: Test.Main
     dependencies: []

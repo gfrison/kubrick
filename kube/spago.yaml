@@ -1,0 +1,24 @@
+package:
+  name: kubrick-kube
+  dependencies:
+    - arrays
+    - console
+    - effect
+    - foldable-traversable
+    - kubrick-eden
+    - lists
+    - maybe
+    - ordered-collections
+    - prelude
+    - spec-node
+    - transformers
+    - tuples
+    - unordered-collections
+  test:
+    main: Test.Kube.Main
+    dependencies:
+      - aff
+      - spec
+  publish:
+    version: 0.1.0
+    license: MIT
