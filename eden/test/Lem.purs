@@ -5,7 +5,7 @@ import Prelude
 import Data.List as List
 import Data.List.Types (List(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Bag1, Dict1, Lem(..), Sek1, (<+), (<+>), (+:), (:::), (:+))
+import Kubrick.Lem (Lem(..), (<+), (<+>), (+:), (:::), (:+))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldNotEqual)
 
@@ -97,14 +97,14 @@ spec = do
 
     describe "Sekdict constructor (via ::: operator)" do
       it "creates Sekdict using :::" do
-        let sekdict = Sek (L1 1) (L1 2) Nil ::: Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil
+        let sekdict = (1 /\ 2) +: L1 3
         case sekdict of
           Sekdict _ _ -> true `shouldEqual` true
           _ -> false `shouldEqual` true
 
       it "creates Sekdict with single values" do
-        let sek1 = L1 1 ::: Pair (L1 1) (L1 10)
-        let sek2 = L1 1 ::: Pair (L1 1) (L1 10)
+        let sek1 = (1 /\ 2) +: L1 3
+        let sek2 = (1 /\ 2) +: L1 3
         sek1 `shouldEqual` sek2
 
     describe "Bagdict constructor (via <+> operator)" do
@@ -256,7 +256,7 @@ spec = do
 
       it "prepend primitive to Sek" do
         let result = 1 +: Sek (L1 2) (L1 3) Nil
-        result `shouldEqual` Sek (L1 1) (L1 2) (List.singleton (L1 3))
+        result `shouldEqual` Sek (L1 1) (Sek (L1 2) (L1 3) Nil) Nil
 
       it "prepend primitive to Bag" do
         let result = 1 +: Bag (L1 2) (L1 3) Nil
@@ -286,7 +286,7 @@ spec = do
 
       it "prepend L1 to Sek" do
         let result = (L1 1) ::: Sek (L1 2) (L1 3) Nil
-        result `shouldEqual` Sek (L1 1) (L1 2) (List.singleton (L1 3))
+        result `shouldEqual` Sek (L1 1) (Sek (L1 2) (L1 3) Nil) Nil
 
       --       it "prepend L1 to Pair" do
       --         let result = (L1 "a") ::: Pair (L1 "k") (L1 "v")
@@ -387,15 +387,15 @@ spec = do
     describe ":+ operator (postpend primitive)" do
       it "postpend primitive to L1" do
         let result = (L1 1) :+ 2
-        result `shouldEqual` Sek (L1 1) (L1 2) Nil
+        result `shouldEqual` Sek (L1 2) (L1 1) Nil
 
       it "postpend primitive to Sek" do
         let result = Sek (L1 1) (L1 2) Nil :+ 3
-        result `shouldEqual` Sek (L1 1) (L1 2) (List.singleton (L1 3))
+        result `shouldEqual` Sek (L1 3) (Sek (L1 1) (L1 2) Nil) Nil
 
       it "postpend primitive to Bag" do
         let result = Bag (L1 1) (L1 2) Nil :+ 3
-        result `shouldEqual` Sek (Bag (L1 1) (L1 2) Nil) (L1 3) Nil
+        result `shouldEqual` Sek (L1 3) (Bag (L1 1) (L1 2) Nil) Nil
 
       --       it "postpend primitive to Choice" do
       --         let result = Choice (L1 1) (L1 2) Nil :+ 3
@@ -411,7 +411,7 @@ spec = do
 
       it "postpend tuple to Sek" do
         let result = Sek (L1 1) (L1 2) Nil :+ (3 /\ 30)
-        result `shouldEqual` Sek (L1 1) (L1 2) (List.singleton (Pair (L1 3) (L1 30)))
+        result `shouldEqual` Sek (Pair (L1 3) (L1 30)) (Sek (L1 1) (L1 2) Nil) Nil
 
       it "postpend primitive to L0" do
         let result = (L0 :: Lem Int) :+ 1

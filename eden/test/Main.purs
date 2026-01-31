@@ -8,6 +8,7 @@ import Test.Lem.Integrity as IntegrityTests
 import Test.Lem.Show as ShowTests
 import Test.Lem.Traversable as TraversableTests
 import Test.Lem.Uniqueness as UniquenessTests
+import Test.ReticoloTest as ReticoloTests
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner.Node (runSpecAndExitProcess)
 
@@ -19,3 +20,4 @@ main = runSpecAndExitProcess [ consoleReporter ] do
   UniquenessTests.spec
   IntegrityTests.spec
   ConstructorTests.spec
+  ReticoloTests.spec

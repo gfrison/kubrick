@@ -6,7 +6,7 @@ import Data.List as List
 import Data.List.Types (List(..))
 import Data.String as String
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Bag1, Dict1, Lem(..), Sek1, (<+), (<+>), (:::))
+import Kubrick.Lem (Lem(..), (<+), (<+>), (+:))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldSatisfy)
 
@@ -72,7 +72,7 @@ spec = do
 
     describe "showLem with composite types" do
       it "shows Sekdict" do
-        let sekdict = L1 1 ::: Pair (L1 2) (L1 3)
+        let sekdict = (1 /\ 2) +: L1 3
         show sekdict `shouldSatisfy` (String.contains (String.Pattern "Sekdict"))
 
       it "shows Bagdict" do

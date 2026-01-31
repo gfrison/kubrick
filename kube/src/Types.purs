@@ -16,6 +16,7 @@ import Data.Map (Map, lookup, insertWith)
 import Data.Maybe (Maybe(..))
 import Data.Set (Set, singleton, union, empty)
 import Data.Set as Set
+import Kubrick.Types (Raw)
 
 -- | M2m = Many-to-Many bidirectional map
 data M2m k v = M2m (Map k (Set v)) (Map v (Set k))
@@ -50,15 +51,16 @@ bi0 :: forall a. Ord a => Bi a
 bi0 = M2m mempty mempty
 {-
 Kube record type
-kid types are writted with "kn" where n is the kid number
+kid types are writted with "kn" where n does not necessary represent its int value but rather 
+it distinsguishes different kids.
 M2m are written just with the k -> v mapping for clarity omitting the reverse mapping v -> k
 L1 a       -> {seqs = [{a -> k0}], roots = {k0}}
 Sek a b    -> {seqs = [{a -> k0}, {b -> k0}], roots = {k0}}
 Bag a b    -> {keys = {a -> k0, b -> k0}], roots = {k0}, sets = {k0}}
 Choice a b -> {keys = {a -> k0, b -> k0}, roots = {k0}}
 Pair a b   -> {keys = {a -> k0}, vals = {b -> k0}, roots = {k0}}
-Dict (ka /\ va) ( kb /\ vb) ->
-  { keys    = [{ka -> k0}, {kb -> k1}]
+Dict (ca /\ va) ( cb /\ vb) ->
+  { keys    = [{ca -> k0}, {cb -> k1}]
   , vals    = [{va -> k0}, {vb -> k1}]
   , refKeys = {k2 -> {k0, k1}} 
   , roots   = {k2}
@@ -77,23 +79,32 @@ Sek(Sek(a  b) Sek(c  d)) ->
     refSeqs = [{k0 -> k2}, {k1 -> k2}],
     roots = {k2}
   }
+Sekdict (Sek(a  b) Sek(c  d)) Dict (e -> f) (g -> i)->
+  {
+    seqs = [{a -> k0, c -> k1}, {b -> k0, d -> k1}],
+    refSeqs = [{k0 -> k2}, {k1 -> k2}],
+    keys = [{e -> k3}, {g -> k4}],
+    vals = [{f -> k3}, {i -> k4}],
+    refKeys = {k2 -> {k3, k4}},
+    roots = {k2}
+  }
 
 store 2 distinct Lem:
 Sek a b, Sek 10 11 -> {seqs = [{a -> k0, 10 -> k1}, {b -> k0, 11 -> k1}], roots = {k0,k1}}
 -}
-type Kube a =
-  { seqs :: Array (Bi a) -- Positional sequences (data values)
+type Kube =
+  { seqs :: Array (Bi Raw) -- Positional sequences (data values)
   , refSeqs :: Array (Bi Kid) -- Positional sequences (Kid references)
-  , keys :: Bi a -- Key index (data values)
+  , keys :: Bi Raw -- Key index (data values)
   , refKeys :: Bi Kid -- Key index (Kid references)
-  , vals :: Bi a -- Value index (data values)
+  , vals :: Bi Raw -- Value index (data values)
   , refVals :: Bi Kid -- Value index (Kid references)
   , roots :: Set Kid -- Top level document IDs
   , sets :: Set Kid -- Set IDs
   }
 
 -- | Create empty kube
-emptyKube :: forall a. Ord a => Kube a
+emptyKube :: Kube
 emptyKube =
   { seqs: []
   , refSeqs: []

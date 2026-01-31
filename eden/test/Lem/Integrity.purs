@@ -5,8 +5,7 @@ import Prelude
 import Data.List ((:))
 import Data.List.Types (List(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Dict1(..), Lem(..), (<+), (<+>))
-import Kubrick.Lem as Lem
+import Kubrick.Lem (Lem(..), (<+), (<+>), (\/), lem)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldNotEqual)
 
@@ -28,10 +27,10 @@ spec = do
         -- But direct construction bypasses uniqueness check
         badBag1 `shouldEqual` badBag2
 
-        -- Now create correct Bag using smart constructor
-        let goodBag = Lem.bag 1 1 (1 : Nil)
+        -- Now create correct Bag using <+> operator
+        let goodBag = L1 1 <+> L1 1 <+> L1 1
 
-        -- Smart constructor removes duplicates and collapses to L1
+        -- Operator removes duplicates and collapses to L1
         goodBag `shouldEqual` (L1 1)
 
         -- badBag1 is NOT equal to what bag produces!
@@ -40,10 +39,11 @@ spec = do
       it "direct construction allows duplicates in different positions" do
         let
           badBag = Bag (L1 1) (L1 2) (L1 1 : L1 2 : Nil) -- 1 and 2 appear twice each
-          goodBag = Lem.bag 1 2 (1 : 2 : Nil)
+          -- <+> operator creates nested Bags when chained
+          goodBag = L1 1 <+> L1 2 <+> L1 1 <+> L1 2
 
-        -- Smart constructor deduplicates
-        goodBag `shouldEqual` Bag (L1 1) (L1 2) Nil
+        -- Operator deduplicates within each Bag it creates
+        goodBag `shouldEqual` Bag (Bag (Bag (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 2) Nil
 
         -- Direct construction keeps duplicates
         badBag `shouldNotEqual` goodBag
@@ -57,18 +57,20 @@ spec = do
       it "direct construction with duplicates breaks integrity" do
         let
           badChoice = Choice (L1 "a") (L1 "a") (L1 "a" : Nil)
-          goodChoice = Lem.choice "a" "a" ("a" : Nil)
+          goodChoice = L1 "a" \/ L1 "a" \/ L1 "a"
 
         goodChoice `shouldEqual` (L1 "a")
         badChoice `shouldNotEqual` goodChoice
 
       it "choice enforces uniqueness" do
         let
-          choice1 = Lem.choice 1 2 (1 : 3 : Nil)
-          choice2 = Lem.choice 3 2 (1 : Nil)
+          -- \/ operator creates nested Choice structures when chained
+          choice1 = L1 1 \/ L1 2 \/ L1 1 \/ L1 3
+          choice2 = L1 3 \/ L1 2 \/ L1 1
 
-        -- Both should have unique elements {1, 2, 3} regardless of order
-        choice1 `shouldEqual` choice2
+        -- Both should deduplicate within their structures
+        choice1 `shouldEqual` Choice (Choice (Choice (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 3) Nil
+        choice2 `shouldEqual` Choice (Choice (L1 3) (L1 2) Nil) (L1 1) Nil
 
     describe "Correct usage with operators" do
       it "<+> operator enforces uniqueness automatically" do
@@ -83,12 +85,13 @@ spec = do
           _ -> pure unit -- Could also collapse to smaller structure
 
       it "bag handles all duplicates correctly" do
-        let allSame = Lem.bag 42 42 (42 : 42 : Nil)
+        let allSame = L1 42 <+> L1 42 <+> L1 42 <+> L1 42
         allSame `shouldEqual` (L1 42)
 
       it "choice handles partial duplicates correctly" do
-        let someDups = Lem.choice 1 2 (1 : 3 : 2 : Nil)
-        let expected = Lem.choice 1 2 (3 : Nil)
+        -- \/ operator creates nested structures
+        let someDups = L1 1 \/ L1 2 \/ L1 1 \/ L1 3 \/ L1 2
+        let expected = Choice (Choice (Choice (Choice (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 3) Nil) (L1 2) Nil
         someDups `shouldEqual` expected
 
     describe "What NOT to do (documented violations)" do
@@ -96,8 +99,8 @@ spec = do
         -- BAD: Direct construction allows invalid state
         let invalid = Bag (L1 "x") (L1 "x") Nil
 
-        -- GOOD: Use smart constructor
-        let valid = Lem.bag "x" "x" Nil
+        -- GOOD: Use <+> operator
+        let valid = L1 "x" <+> L1 "x"
 
         valid `shouldEqual` (L1 "x")
         invalid `shouldNotEqual` valid
@@ -117,9 +120,10 @@ spec = do
         -- VIOLATION: Constructing Dict directly with duplicate keys
         let
           badDict = Dict (L1 1 /\ L1 10) (L1 1 /\ L1 20) Nil -- Key "1" appears twice!
-          goodDict = Lem.dict (1 /\ 10) (1 /\ 20) Nil
+          goodDict :: Lem Int
+          goodDict = lem ((1 /\ 10) : Nil) <+ (1 /\ 20)
 
-        -- Smart constructor removes duplicate keys (keeps first occurrence)
+        -- Operator removes duplicate keys (keeps first occurrence)
         goodDict `shouldEqual` Pair (L1 1) (L1 10)
 
         -- badDict is NOT equal to what dict produces!
@@ -128,9 +132,10 @@ spec = do
       it "direct construction allows multiple values for same key" do
         let
           badDict = Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) ((L1 1 /\ L1 30) : Nil)
-          goodDict = Lem.dict (1 /\ 10) (2 /\ 20) ((1 /\ 30) : Nil)
+          goodDict :: Lem Int
+          goodDict = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30)
 
-        -- Smart constructor keeps only first occurrence of each key
+        -- Operator keeps only first occurrence of each key
         goodDict `shouldEqual` Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil
 
         -- Direct construction keeps duplicates
@@ -138,45 +143,54 @@ spec = do
 
       it "dict enforces key uniqueness" do
         let
-          dict1 = Lem.dict (1 /\ 10) (2 /\ 20) ((1 /\ 30) : Nil)
-          dict2 = Lem.dict (2 /\ 20) (1 /\ 10) Nil
+          dict1 :: Lem Int
+          dict1 = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30)
+          dict2 :: Lem Int
+          dict2 = lem ((2 /\ 20) : Nil) <+ (1 /\ 10)
 
         -- Both should have unique keys {1, 2} regardless of order
         dict1 `shouldEqual` dict2
 
       it "operator <+ prevents duplicate keys" do
-        let pair = Pair (L1 1) (L1 100)
-        let result = pair <+ (1 /\ 200) -- Same key 1
+        let pair :: Lem Int
+            pair = lem ((1 /\ 100) : Nil)
+        let result :: Lem Int
+            result = pair <+ (1 /\ 200) -- Same key 1
 
         -- Should have only one entry for key 1 (the first one)
         result `shouldEqual` Pair (L1 1) (L1 100)
 
     describe "D2 key uniqueness enforcement" do
-      it "dict smart constructor prevents duplicate keys by collapsing to Pair" do
+      it "operator prevents duplicate keys by collapsing to Pair" do
         let
-          -- Only way to create is through smart constructor
-          -- which enforces uniqueness by collapsing to single key/value pair
-          result = Lem.dict (1 /\ 10) (1 /\ 20) Nil
+          -- Using <+ operator enforces uniqueness by collapsing to single key/value pair
+          result :: Lem Int
+          result = lem ((1 /\ 10) : Nil) <+ (1 /\ 20)
 
-        -- Smart constructor with duplicate keys collapses to single Pair
+        -- Operator with duplicate keys collapses to single Pair
         result `shouldEqual` Pair (L1 1) (L1 10)
 
-      it "d2 enforces key uniqueness" do
+      it "<+ operator enforces key uniqueness" do
         let
-          d2a = Lem.d2 (1 /\ 10) (2 /\ 20) ((1 /\ 30) : Nil)
-          d2b = Lem.d2 (2 /\ 20) (1 /\ 10) Nil
+          d2a :: Lem Int
+          d2a = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30)
+          d2b :: Lem Int
+          d2b = lem ((2 /\ 20) : Nil) <+ (1 /\ 10)
 
         -- Should have unique keys {1, 2}
         d2a `shouldEqual` d2b
 
     describe "Dict/D2 correct usage" do
-      it "dict handles all duplicate keys correctly" do
-        let allSame = Lem.dict (1 /\ 10) (1 /\ 20) ((1 /\ 30) : Nil)
+      it "<+ operator handles all duplicate keys correctly" do
+        let allSame :: Lem Int
+            allSame = lem ((1 /\ 10) : Nil) <+ (1 /\ 20) <+ (1 /\ 30)
         allSame `shouldEqual` Pair (L1 1) (L1 10)
 
-      it "d2 handles partial duplicate keys correctly" do
-        let someDups = Lem.d2 (1 /\ 10) (2 /\ 20) ((1 /\ 30) : (3 /\ 40) : Nil)
-        let expected = Lem.d2 (1 /\ 10) (2 /\ 20) ((3 /\ 40) : Nil)
+      it "<+ operator handles partial duplicate keys correctly" do
+        let someDups :: Lem Int
+            someDups = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30) <+ (3 /\ 40)
+        let expected :: Lem Int
+            expected = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (3 /\ 40)
         someDups `shouldEqual` expected
 
 {-

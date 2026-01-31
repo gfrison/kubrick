@@ -2,9 +2,20 @@ module Kubrick.Lem
   ( -- * Operators (recommended API - USE THESE)
     (<+)
   , (<+>)
-  , (+:)
-  , (:::)
+  --|  prepend a primitive or Tuple to a Lem to another Lem
+  --| 1 +: L1 2 -> Sek (L1 1) (L1 2) Nil
+  --| (1 /\ 2) +: L1 3 -> Sekdict (S1 (L1 3)) (D1 (L1 1) (L1 2))
+  --| (Sek (L1 2) (L1 3) Nil) +: L1 1 -> Sek (L1 1) (L1 2) (L1 3 : Nil)
+  --| (Sek (L1 1) (L1 2) Nil) +: (Sek (L1 3) (L1 4) Nil) -> Sek (L1 1) (L1 2) (L1 3 : L1 4 : Nil)
+  , (+:) 
   , (:+)
+  --| creates a Sek indipendently of the arguments
+  --| (Sek (L1 1) (L1 2) Nil) ::: (Sek (L1 3) (L1 4) Nil) -> Sek (Sek (L1 1) (L1 2) Nil) (Sek (L1 3) (L1 4) Nil) Nil
+  , (:::)
+  --| create a choice between two Lem values or a primitive and a Lem 
+  , (\/)
+  , class Or
+  , or
   -- * Types
   -- | Note: Sekdict and Bagdict are created by operators, not by users directly
   , Lem(..)
@@ -14,11 +25,11 @@ module Kubrick.Lem
   , class CombineLem
   , combine
   , class PreLem
-  , pre
+  , concat
   , class PrePrimitive
-  , prep
+  , prependPrimitive
   , class PostPrimitive
-  , post
+  , appendPrimitive 
   -- * Polymorphic Constructor
   , class MakeLem
   , lem
@@ -26,10 +37,6 @@ module Kubrick.Lem
   , Sek1(..)
   , Bag1(..)
   , Dict1(..)
-  , bag
-  , choice
-  , dict
-  , d2
   ) where
 
 -- * Imports
@@ -205,47 +212,60 @@ else instance makeLemTupleList :: Eq t => MakeLem (List (Tuple t t)) t where
 
 -- | Type class for prepending a primitive to Lem
 class PrePrimitive t a where
-  prep :: Eq t => a -> Lem t -> Lem t
+  prependPrimitive :: Eq t => a -> Lem t -> Lem t
 
 class PreLem t where
-  pre :: Eq t => Lem t -> Lem t -> Lem t
+  concat :: Eq t => Lem t -> Lem t -> Lem t
 
 instance preLem :: Eq t => PreLem t where
-  pre lem (L1 y) = Sek lem (L1 y) Nil
-  pre lem (Sek fst snd rest) = Sek lem fst (snd : rest)
-  pre lem (Sekdict sek dict) = Sekdict
+  concat a b = Sek a b Nil
+
+instance prePrimitiveValue :: Eq t => PrePrimitive t t where
+  prependPrimitive el L0 = L1 el
+  prependPrimitive el lem = concat (L1 el) lem
+else instance preTuple :: Eq t => PrePrimitive t (Tuple t t) where
+  prependPrimitive (a /\ b) L0 = Pair (L1 a) (L1 b)
+  prependPrimitive (a /\ b) (L1 x) = Sekdict (S1 (L1 x)) (D1 (L1 a) (L1 b))
+  prependPrimitive (a /\ b) lem = concat (Pair (L1 a) (L1 b)) lem
+else instance prependLem :: Eq t => PrePrimitive t (Lem t) where
+  prependPrimitive (Sek x y rest) (L1 z) = Sek (L1 z) x (y : rest)
+  prependPrimitive (Sek a b c) (Sek fst snd rest) = Sek a b (c <> (fst : snd : rest))
+  prependPrimitive (Sekdict sek dict) (Sek fst snd rest) = Sekdict
+    ( case sek of
+        S2 f s r -> S2 f s (r <> (fst : snd : rest))
+        S1 l -> S2 l fst (snd : rest)
+    )
+    dict
+  prependPrimitive (Sek a b c) (Sekdict sek dict) = Sekdict
+    ( case sek of
+        S2 f s r -> S2 a b (c <> (f : s : r))
+        S1 l -> S2 a b (c <> (l : Nil))
+    )
+    dict
+  prependPrimitive lem (Sek fst snd rest) = Sek lem fst (snd : rest)
+  prependPrimitive lem (Sekdict sek dict) = Sekdict
     ( case sek of
         S2 fst snd rest -> S2 lem fst (snd : rest)
         S1 l -> S2 lem l Nil
     )
     dict
-  pre lem (Pair k v) = Sekdict (S1 lem) (D1 k v)
-  pre lem (Dict fst snd rest) = Sekdict (S1 lem) (D2 fst snd rest)
-  pre a b = Sek a b Nil
-
-instance prePrimitiveValue :: Eq t => PrePrimitive t t where
-  prep el L0 = L1 el
-  prep el lem = pre (L1 el) lem
-else instance preTuple :: Eq t => PrePrimitive t (Tuple t t) where
-  prep (a /\ b) L0 = Pair (L1 a) (L1 b)
-  prep (a /\ b) lem = pre (Pair (L1 a) (L1 b)) lem
-
+  prependPrimitive lem (L1 y) = Sek lem (L1 y) Nil
+  prependPrimitive lem (Pair k v) = Sekdict (S1 lem) (D1 k v)
+  prependPrimitive lem (Dict fst snd rest) = Sekdict (S1 lem) (D2 fst snd rest)
+  prependPrimitive L0 b = b
+  prependPrimitive a L0 = a
+  prependPrimitive (Pair a b) lem = (Pair a b) <+> lem
+  prependPrimitive a b = Sek a b Nil
+  
 class PostPrimitive t a where
-  post :: Eq t => Lem t -> a -> Lem t
+  appendPrimitive :: Eq t => Lem t -> a -> Lem t
 
 instance postPrimitiveValue :: Eq t => PostPrimitive t t where
-  post (L1 x) el = Sek (L1 x) (L1 el) Nil
-  post (Sek fst snd rest) el = Sek fst snd (List.snoc rest (L1 el))
-  post (Bag fst snd rest) el = Sek (Bag fst snd rest) (L1 el) Nil
-  post (Choice fst snd rest) el = Sek (Choice fst snd rest) (L1 el) Nil
-  post L0 el = L1 el
-  post lem el = Sek lem (L1 el) Nil
+  appendPrimitive lem el = prependPrimitive el lem
 else instance postTuple :: Eq t => PostPrimitive t (Tuple t t) where
-  post (Pair k v) (a /\ b) = Sekdict (S1 (Pair k v)) (D1 (L1 a) (L1 b))
-  post (Dict fst snd rest) (a /\ b) = Sekdict (S1 (Dict fst snd rest)) (D1 (L1 a) (L1 b))
-  post (Sek fst snd rest) (a /\ b) = Sek fst snd (List.snoc rest (Pair (L1 a) (L1 b)))
-  post L0 (a /\ b) = Pair (L1 a) (L1 b)
-  post lem (a /\ b) = Sek lem (Pair (L1 a) (L1 b)) Nil
+  appendPrimitive lem (a /\ b) = prependPrimitive (a /\ b) lem
+else instance appendLem :: Eq t => PostPrimitive t (Lem t) where
+  appendPrimitive a b = prependPrimitive b a
 
 -- Type class for addPrimitiveing an element to Lem, it will create Bag or Bagdict as needed
 class AddPrimitive t a where
@@ -277,13 +297,21 @@ instance combineLem :: Eq t => CombineLem t where
   combine lem L0 = lem
   combine lem1 lem2 = bagLem lem1 lem2 Nil
 
+class Or s t where
+  or :: Eq t => s -> Lem t -> Lem t
+instance orLem :: Eq t => Or (Lem t) t where
+  or lem L0  = lem
+  or a b = choiceLem a b Nil
+else instance orPrimitive :: Eq t => Or t t where
+  or p lem = choiceLem (L1 p) lem Nil
 -- ** Infix Operators
 
 infixl 6 addPrimitive as <+
-infixl 6 prep as +:
-infixl 6 post as :+
-infixl 6 pre as :::
+infixl 6 prependPrimitive as +:
+infixl 6 appendPrimitive as :+
+infixl 6 concat as :::
 infixl 6 combine as <+>
+infixl 6 or as \/
 
 -- ** Standard Type Class Instances
 

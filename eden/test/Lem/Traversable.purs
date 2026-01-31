@@ -9,7 +9,7 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse, sequence)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Bag1, Dict1, Lem(..), Sek1, (<+), (<+>), (:::), (:+))
+import Kubrick.Lem (Lem(..), (:::), (<+>))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
