@@ -1,8 +1,9 @@
 module Kubrick.Types
   ( Var(..)
-  , Vid
+  , Vid(..)
   , RawType(..)
   , Raw(..)
+  , Term(..)
   ) where
 
 import Prelude
@@ -10,7 +11,16 @@ import Prelude
 import Data.Hashable (class Hashable, hash)
 
 data Var = FreeVar | Sar String
-type Vid = Int
+newtype Vid = Vid Int
+
+derive instance eqVid :: Eq Vid
+derive instance ordVid :: Ord Vid
+
+instance showVid :: Show Vid where
+  show (Vid n) = "Vid " <> show n
+
+instance hashableVid :: Hashable Vid where
+  hash (Vid n) = hash n
 
 derive instance eqVar :: Eq Var
 instance Hashable Var where
@@ -39,7 +49,11 @@ data Raw
   | Rf Number
   | Rs String
   | Rb Boolean
-data Term = Var | Raw
+
+-- | Term can be either a variable ID or a raw value
+data Term
+  = TVid Vid
+  | TRaw Raw
 
 derive instance eqRaw :: Eq Raw
 derive instance ordRaw :: Ord Raw
@@ -55,3 +69,14 @@ instance hashableRaw :: Hashable Raw where
   hash (Rf n) = hash n
   hash (Rs s) = hash s
   hash (Rb b) = hash b
+
+derive instance eqTerm :: Eq Term
+derive instance ordTerm :: Ord Term
+
+instance showTerm :: Show Term where
+  show (TVid v) = "TermVid (" <> show v <> ")"
+  show (TRaw r) = "TermRaw (" <> show r <> ")"
+
+instance hashableTerm :: Hashable Term where
+  hash (TVid v) = hash v
+  hash (TRaw r) = hash r

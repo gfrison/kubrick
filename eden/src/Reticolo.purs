@@ -1,4 +1,4 @@
-module Reticolo 
+module Kubrick.Reticolo 
   ( Reticolo
   , module Kubrick.Types
   , Column

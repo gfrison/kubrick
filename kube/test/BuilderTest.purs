@@ -10,7 +10,7 @@ import Data.Maybe (fromMaybe)
 import Data.Set as Set
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Kube (Kid(..), add, (+), addM, emptyKube)
+import Kubrick.Kube (Kid(..), (+), addM, emptyKube)
 import Kubrick.Kube.Types (getKeys, getValues)
 import Kubrick.Kube.Types as Kubrick.Kube.Types
 import Kubrick.Types (Raw(..))
@@ -114,7 +114,7 @@ spec = do
     describe "Example 6: Dict (ka /\\ va) (kb /\\ vb)" do
       it "Dict (ka /\\ va) (kb /\\ vb) -> {keys = {ka -> k0, kb -> k1}, vals = {va -> k0, vb -> k1}, refKeys = {k2 -> {k0, k1}}, roots = {k2}}" do
         let
-          input = lem (((Rs "ka") /\ (Rs "va")) : Nil) <+ ((Rs "kb") /\ (Rs "vb"))
+          input = ((Rs "kb") /\ (Rs "vb")) <+ lem (((Rs "ka") /\ (Rs "va")) : Nil)
           (kube /\ _) = emptyKube + input
           dictKid = Kid 2
         -- roots should contain exactly one Kid (the Dict)
@@ -218,7 +218,7 @@ spec = do
           sek2 :: Lem Raw
           sek2 = (Rs "c") +:   ((Rs "d") +:   L0)
           outerSek = sek1 ::: sek2
-          dictPart = lem (((Rs "e") /\ (Rs "f")) : Nil) <+ ((Rs "g") /\ (Rs "i"))
+          dictPart = ((Rs "g") /\ (Rs "i")) <+ lem (((Rs "e") /\ (Rs "f")) : Nil)
           input = outerSek +: dictPart  -- Prepend outerSek to Dict creates Sekdict
           Tuple sekdictKid (Tuple _ kube) = runState (addM input) (Tuple (Kid 0) emptyKube)
         -- Check if it's actually a Sekdict

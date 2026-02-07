@@ -7,7 +7,7 @@ import Data.Either (Either(..))
 import Data.Map as Map
 import Data.Maybe (Maybe(..), isNothing)
 import Partial.Unsafe (unsafeCrashWith)
-import Reticolo as R
+import Kubrick.Reticolo as R
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldSatisfy)
 

@@ -1,43 +1,33 @@
 module Kubrick.Lem
-  ( -- * Operators (recommended API - USE THESE)
-    (<+)
-  , (<+>)
-  --|  prepend a primitive or Tuple to a Lem to another Lem
-  --| 1 +: L1 2 -> Sek (L1 1) (L1 2) Nil
-  --| (1 /\ 2) +: L1 3 -> Sekdict (S1 (L1 3)) (D1 (L1 1) (L1 2))
-  --| (Sek (L1 2) (L1 3) Nil) +: L1 1 -> Sek (L1 1) (L1 2) (L1 3 : Nil)
-  --| (Sek (L1 1) (L1 2) Nil) +: (Sek (L1 3) (L1 4) Nil) -> Sek (L1 1) (L1 2) (L1 3 : L1 4 : Nil)
-  , (+:) 
+  ( (+:)
+  , (+>)
   , (:+)
-  --| creates a Sek indipendently of the arguments
-  --| (Sek (L1 1) (L1 2) Nil) ::: (Sek (L1 3) (L1 4) Nil) -> Sek (Sek (L1 1) (L1 2) Nil) (Sek (L1 3) (L1 4) Nil) Nil
   , (:::)
-  --| create a choice between two Lem values or a primitive and a Lem 
+  , (<+)
+  , (<+>)
   , (\/)
-  , class Or
-  , or
-  -- * Types
-  -- | Note: Sekdict and Bagdict are created by operators, not by users directly
-  , Lem(..)
-  -- * Type Classes
-  , class AddPrimitive
-  , addPrimitive
-  , class CombineLem
-  , combine
-  , class PreLem
-  , concat
-  , class PrePrimitive
-  , prependPrimitive
-  , class PostPrimitive
-  , appendPrimitive 
-  -- * Polymorphic Constructor
-  , class MakeLem
-  , lem
-  -- * INTERNAL - Do not use directly (exported for Builder access only)
-  , Sek1(..)
   , Bag1(..)
   , Dict1(..)
-  ) where
+  , Lem(..)
+  , Sek1(..)
+  , addPrimitive
+  , addPrimitiveFlipped
+  , appendPrimitive
+  , class AddPrimitive
+  , class AddPrimitiveFlipped
+  , class CombineLem
+  , class MakeLem
+  , class Or
+  , class PostPrimitive
+  , class PreLem
+  , class PrePrimitive
+  , combine
+  , concat
+  , lem
+  , or
+  , prependPrimitive
+  )
+  where
 
 -- * Imports
 
@@ -85,6 +75,7 @@ data Dict1 t
 -- |   - Dict: key uniqueness (first element of each Tuple)
 data Lem t
   = L0
+  | Gap -- empty cell for search  
   | L1 t
   | Pair (Lem t) (Lem t)
   | Sek (Lem t) (Lem t) (List (Lem t)) -- Sek with at least 2 elements
@@ -125,11 +116,6 @@ choiceLem fst snd rest =
       f : Nil -> f
       _ -> L0
 
--- Smart constructor for Choice that ensures uniqueness
--- | Takes primitive values and wraps them in L1
-choice :: forall t. Eq t => t -> t -> List t -> Lem t
-choice fst snd rest = choiceLem (L1 fst) (L1 snd) (map L1 rest)
-
 -- Internal helper for Dict that works with Lem values
 dictLem :: forall t. Eq t => Tuple (Lem t) (Lem t) -> Tuple (Lem t) (Lem t) -> List (Tuple (Lem t) (Lem t)) -> Lem t
 dictLem fst snd rest =
@@ -166,15 +152,6 @@ d2Lem fst snd rest =
       f : Nil -> case f of
         Tuple k v -> D1 k v
       _ -> D1 L0 L0 -- Should not happen, but needed for totality
-
--- | Smart constructor for D2 that ensures key uniqueness
--- | Takes tuples of primitive values and wraps them
-d2 :: forall t. Eq t => Tuple t t -> Tuple t t -> List (Tuple t t) -> Dict1 t
-d2 fst snd rest =
-  let
-    wrapPair (Tuple k v) = Tuple (L1 k) (L1 v)
-  in
-    d2Lem (wrapPair fst) (wrapPair snd) (map wrapPair rest)
 
 -- * Polymorphic Constructor
 
@@ -222,6 +199,8 @@ instance preLem :: Eq t => PreLem t where
 
 instance prePrimitiveValue :: Eq t => PrePrimitive t t where
   prependPrimitive el L0 = L1 el
+  prependPrimitive el (L1 x) = Sek (L1 el) (L1 x) Nil
+  prependPrimitive el (Sek fst snd rest) = Sek (L1 el) fst (snd : rest)
   prependPrimitive el lem = concat (L1 el) lem
 else instance preTuple :: Eq t => PrePrimitive t (Tuple t t) where
   prependPrimitive (a /\ b) L0 = Pair (L1 a) (L1 b)
@@ -250,17 +229,24 @@ else instance prependLem :: Eq t => PrePrimitive t (Lem t) where
     )
     dict
   prependPrimitive lem (L1 y) = Sek lem (L1 y) Nil
+  prependPrimitive lem Gap = Sek lem Gap Nil
+  prependPrimitive Gap lem = Sek Gap lem Nil
   prependPrimitive lem (Pair k v) = Sekdict (S1 lem) (D1 k v)
   prependPrimitive lem (Dict fst snd rest) = Sekdict (S1 lem) (D2 fst snd rest)
   prependPrimitive L0 b = b
   prependPrimitive a L0 = a
   prependPrimitive (Pair a b) lem = (Pair a b) <+> lem
   prependPrimitive a b = Sek a b Nil
-  
+
 class PostPrimitive t a where
   appendPrimitive :: Eq t => Lem t -> a -> Lem t
 
 instance postPrimitiveValue :: Eq t => PostPrimitive t t where
+  appendPrimitive (L1 x) el = Sek (L1 x) (L1 el) Nil
+  appendPrimitive Gap el = Sek Gap (L1 el) Nil
+  appendPrimitive (Sek fst snd rest) el = Sek fst snd (List.snoc rest (L1 el))
+  appendPrimitive (Bag fst snd rest) el = Sek (Bag fst snd rest) (L1 el) Nil
+  appendPrimitive L0 el = L1 el
   appendPrimitive lem el = prependPrimitive el lem
 else instance postTuple :: Eq t => PostPrimitive t (Tuple t t) where
   appendPrimitive lem (a /\ b) = prependPrimitive (a /\ b) lem
@@ -269,18 +255,34 @@ else instance appendLem :: Eq t => PostPrimitive t (Lem t) where
 
 -- Type class for addPrimitiveing an element to Lem, it will create Bag or Bagdict as needed
 class AddPrimitive t a where
-  addPrimitive :: Eq t => Lem t -> a -> Lem t
+  addPrimitive :: Eq t => a -> Lem t -> Lem t
 
 instance addPrimitiveValue :: Eq t => AddPrimitive t t where
-  addPrimitive (L1 x) el = Sek (L1 x) (L1 el) Nil
-  addPrimitive (Sek fst snd rest) el = Sek fst snd (List.snoc rest (L1 el))
-  addPrimitive (Bag fst snd rest) el = bagLem fst snd (L1 el : rest)
-  addPrimitive (Choice fst snd rest) el = choiceLem fst snd (L1 el : rest)
-  addPrimitive lem el = combine lem (L1 el)
+  addPrimitive el L0 = L1 el
+  addPrimitive el (L1 x) = combine (L1 el) (L1 x)
+  addPrimitive el Gap = combine (L1 el) Gap
+  addPrimitive el (Sek fst snd rest) = combine (L1 el) (Sek fst snd rest)
+  addPrimitive el (Bag fst snd rest) = bagLem fst snd (L1 el : rest)
+  addPrimitive el (Choice fst snd rest) = choiceLem fst snd (L1 el : rest)
+  addPrimitive el lem = combine (L1 el) lem
 else instance addPrimitiveTuple :: Eq t => AddPrimitive t (Tuple t t) where
-  addPrimitive (Pair k v) (a /\ b) = dictLem (Tuple k v) (Tuple (L1 a) (L1 b)) Nil
-  addPrimitive (Dict fst snd rest) (a /\ b) = dictLem fst snd (Tuple (L1 a) (L1 b) : rest)
-  addPrimitive lem (a /\ b) = combine lem (Pair (L1 a) (L1 b))
+  addPrimitive (a /\ b) Gap = Pair (L1 a) (L1 b)
+  addPrimitive (a /\ b) (Pair k v) = dictLem (Tuple k v) (Tuple (L1 a) (L1 b)) Nil
+  addPrimitive (a /\ b) (Dict fst snd rest) = dictLem fst snd (Tuple (L1 a) (L1 b) : rest)
+  addPrimitive (a /\ b) lem = combine (Pair (L1 a) (L1 b)) lem
+else instance addPrimitiveLem :: Eq t => AddPrimitive t (Lem t) where
+  addPrimitive lem1 lem2 = combine lem1 lem2
+
+-- | Flipped version of addPrimitive for left-associative +> operator
+class AddPrimitiveFlipped a t where
+  addPrimitiveFlipped :: Eq t => Lem t -> a -> Lem t
+
+instance addPrimitiveFlippedValue :: Eq t => AddPrimitiveFlipped t t where
+  addPrimitiveFlipped lem el = addPrimitive el lem
+else instance addPrimitiveFlippedTuple :: Eq t => AddPrimitiveFlipped (Tuple t t) t where
+  addPrimitiveFlipped lem tuple = addPrimitive tuple lem
+else instance addPrimitiveFlippedLem :: Eq t => AddPrimitiveFlipped (Lem t) t where
+  addPrimitiveFlipped lem1 lem2 = combine lem2 lem1
 
 -- | Type class for combining two Lem values
 class CombineLem t where
@@ -288,26 +290,72 @@ class CombineLem t where
 
 instance combineLem :: Eq t => CombineLem t where
   combine (L1 x) (L1 y) = bagLem (L1 x) (L1 y) Nil
+  combine Gap (L1 y) = bagLem Gap (L1 y) Nil
+  combine (L1 x) Gap = bagLem (L1 x) Gap Nil
+  combine Gap Gap = bagLem Gap Gap Nil
   combine (L1 x) (Bag fst snd rest) = bagLem (L1 x) fst (snd : rest)
+  combine Gap (Bag fst snd rest) = bagLem Gap fst (snd : rest)
+  combine (Bag fst snd rest) (L1 x) = bagLem fst snd (L1 x : rest)
+  combine (Bag fst snd rest) Gap = bagLem fst snd (Gap : rest)
   combine (Bag fst1 snd1 rest1) (Bag fst2 snd2 rest2) =
     bagLem fst1 snd1 (snd1 : (rest1 <> fst2 : snd2 : rest2))
   combine (Sek fst snd rest) lem = bagLem (Sek fst snd rest) lem Nil
   combine (Pair k v) lem = Bagdict (B1 lem) (D1 k v)
   combine L0 lem = lem
   combine lem L0 = lem
+  combine Gap lem = bagLem Gap lem Nil
+  combine lem Gap = bagLem lem Gap Nil
   combine lem1 lem2 = bagLem lem1 lem2 Nil
 
 class Or s t where
   or :: Eq t => s -> Lem t -> Lem t
+
 instance orLem :: Eq t => Or (Lem t) t where
-  or lem L0  = lem
+  or lem L0 = lem
   or a b = choiceLem a b Nil
 else instance orPrimitive :: Eq t => Or t t where
   or p lem = choiceLem (L1 p) lem Nil
+
 -- ** Infix Operators
 
-infixl 6 addPrimitive as <+
-infixl 6 prependPrimitive as +:
+-- | Infix operators for constructing Lem values
+-- |
+-- | **Usage Examples:**
+-- |
+-- | **Sequential construction with `+:` (prepend, right-associative):**
+-- | ```purescript
+-- | -- Primitives are automatically wrapped in L1, no need for explicit wrappers
+-- | Rs "a" +: Rs "b" +: Rs "c" +: L0  -- Creates Sek (L1 (Rs "a")) (L1 (Rs "b")) (L1 (Rs "c") : Nil)
+-- | 
+-- | -- Right-associative: chains without parentheses
+-- | 1 +: 2 +: 3 +: L0  -- Same as: 1 +: (2 +: (3 +: L0))
+-- | ```
+-- |
+-- | **Bag construction with `<+>` (combine, left-associative):**
+-- | ```purescript
+-- | -- Use parentheses when mixing different operators (mixed associativity)
+-- | (Rs "a" +: L0) <+> (Rs "b" +: L0)  -- Creates Bag with two L1 elements
+-- | ```
+-- |
+-- | **Concatenation with `:::` (concat, left-associative):**
+-- | ```purescript
+-- | -- Preserves nested structure, use parentheses with +: operator
+-- | (Rs "a" +: L0) ::: (Rs "b" +: Rs "c" +: L0)  -- Creates Sek with two sub-Seks
+-- | ```
+-- |
+-- | **Choice construction with `\/` (or, left-associative):**
+-- | ```purescript
+-- | a \/ b \/ c  -- Creates a Choice between a, b, and c
+-- | ```
+-- |
+-- | **Operator precedence:** All at level 6
+-- | - Right-associative: `+:` (prepend)
+-- | - Left-associative: `:+` (append), `<+` (add), `<+>` (combine), `:::` (concat), `\/` (or)
+-- | - **Important:** Use parentheses when mixing operators with different associativity!
+
+infixr 6 addPrimitive as <+
+infixl 6 addPrimitiveFlipped as +>
+infixr 6 prependPrimitive as +:
 infixl 6 appendPrimitive as :+
 infixl 6 concat as :::
 infixl 6 combine as <+>
@@ -348,6 +396,7 @@ instance eqDict1 :: Eq t => Eq (Dict1 t) where
 
 instance eqLem :: Eq t => Eq (Lem t) where
   eq L0 L0 = true
+  eq Gap Gap = true
   eq (L1 x) (L1 y) = x == y
   eq (Pair k1 v1) (Pair k2 v2) = k1 == k2 && v1 == v2
   eq (Sek f1 s1 r1) (Sek f2 s2 r2) = f1 == f2 && s1 == s2 && r1 == r2
@@ -393,6 +442,7 @@ instance showDict1 :: Show a => Show (Dict1 a) where
 
 instance showLem :: Show a => Show (Lem a) where
   show L0 = "L0"
+  show Gap = "_"
   show (L1 x) = "(L1 " <> show x <> ")"
   show (Pair k v) = "(Pair " <> show k <> " " <> show v <> ")"
   show (Sek fst snd rest) = "(Sek " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
@@ -410,6 +460,7 @@ instance showLem :: Show a => Show (Lem a) where
 
 instance functorLem :: Functor Lem where
   map _ L0 = L0
+  map _ Gap = Gap
   map f (L1 x) = L1 (f x)
   map f (Pair k v) = Pair (map f k) (map f v)
   map f (Sek fst snd rest) = Sek (map f fst) (map f snd) (map (map f) rest)
@@ -451,6 +502,7 @@ instance functorLem :: Functor Lem where
 
 instance foldableLem :: Foldable Lem where
   foldr _ z L0 = z
+  foldr _ z Gap = z
   foldr f z (L1 x) = f x z
   foldr f z (Pair k v) = foldr f (foldr f z v) k
   foldr f z (Sek fst snd rest) = foldr f (foldr f (foldr (flip (foldr f)) z rest) snd) fst
@@ -491,6 +543,7 @@ instance foldableLem :: Foldable Lem where
       zDict
 
   foldl _ z L0 = z
+  foldl _ z Gap = z
   foldl f z (L1 x) = f z x
   foldl f z (Pair k v) = foldl f (foldl f z k) v
   foldl f z (Sek fst snd rest) = foldl (foldl f) (foldl f (foldl f z fst) snd) rest
@@ -534,6 +587,7 @@ instance foldableLem :: Foldable Lem where
 
 instance traversableLem :: Traversable Lem where
   traverse _ L0 = pure L0
+  traverse _ Gap = pure Gap
   traverse f (L1 x) = L1 <$> f x
   traverse f (Pair k v) = Pair <$> traverse f k <*> traverse f v
   traverse f (Sek fst snd rest) = Sek <$> traverse f fst <*> traverse f snd <*> Data.Traversable.traverse (traverse f) rest
@@ -582,6 +636,7 @@ instance traversableLem :: Traversable Lem where
       Bagdict <$> nbag <*> ndict
 
   sequence L0 = pure L0
+  sequence Gap = pure Gap
   sequence (L1 x) = L1 <$> x
   sequence (Pair k v) = Pair <$> sequence k <*> sequence v
   sequence (Sek fst snd rest) = Sek <$> sequence fst <*> sequence snd <*> Data.Traversable.traverse sequence rest

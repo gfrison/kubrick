@@ -136,6 +136,7 @@ modifyBuilder f = state \(Tuple kid builder) -> Tuple unit (Tuple kid (f builder
 -- | Process a document based on its type (State monad version)
 doDoc :: Lem Raw -> Kid -> State (Tuple Kid Kube) Unit
 doDoc L0 _ = pure unit
+doDoc Gap _ = pure unit  -- Gap is ignored
 doDoc (L1 value) kid = modifyBuilder (addPos 0 value kid)
 doDoc (Choice fst snd rest) kid = doChoice (fst : snd : rest) kid Key
 doDoc (Pair k v) kid = doPair k v kid
@@ -160,6 +161,7 @@ doPair k v kid = do
 -- | Process a Pair element (key or value)
 doPairElement :: Lem Raw -> Kid -> Side -> State (Tuple Kid Kube) Unit
 doPairElement L0 _ _ = pure unit
+doPairElement Gap _ _ = pure unit  -- Gap is ignored
 doPairElement (L1 value) kid side =
   modifyBuilder (addIndex value kid side)
 doPairElement (Choice fst snd rest) kid side =
@@ -219,6 +221,7 @@ doLine line kid =
 
 -- | Process a single line element (State monad)
 doLineElement :: Lem Raw -> Int -> Kid -> State (Tuple Kid Kube) Unit
+doLineElement Gap position kid = pure unit  -- Gap is ignored
 doLineElement (Sek fst snd rest) position kid = do
   nid <- nextKid
   doSek (Sek fst snd rest) nid
@@ -253,6 +256,7 @@ doChoice alts parent side =
 -- | Process a single choice element
 doChoiceElement :: Lem Raw -> Kid -> Side -> State (Tuple Kid Kube) Unit
 doChoiceElement L0 _ _ = pure unit
+doChoiceElement Gap _ _ = pure unit  -- Gap is ignored
 doChoiceElement (L1 value) parent side =
   modifyBuilder (addIndex value parent side)
 doChoiceElement (Choice fst snd rest) parent side =

@@ -6,13 +6,56 @@ import Data.List ((:))
 import Data.List.Types (List(..))
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Lem(..), Sek1(..), Dict1(..), Bag1(..), lem, (:::), (<+>), (<+), (+:), (:+), (\/))
+import Kubrick.Lem (Lem(..), Sek1(..), Dict1(..), Bag1(..), lem, (:::), (<+>), (<+),(+>), (+:), (:+), (\/))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
+import Kubrick.Types (Raw(..))
 
 spec :: Spec Unit
 spec = do
   describe "lem constructor" do
+    describe "bag <+" do
+      it "1 <+ 2 <+ L0 -> Bag (L1 1) (L1 2) Nil" do
+        let result = 1 <+ 2 <+ L0
+        result `shouldEqual` Bag (L1 1) (L1 2) Nil
+      it "1 <+ 2 <+ 3 <+ L0 -> Bag (L1 1) (L1 2) (L1 3 : Nil)" do
+        let result = 1 <+ 2 <+ 3 <+ L0
+        result `shouldEqual` Bag (L1 1) (L1 2) (L1 3 : Nil)
+
+      it "L0 +> 1 +> 2 -> Bag (L1 1) (L1 2) Nil" do
+        let result = L0 +> 1 +> 2
+        result `shouldEqual` Bag (L1 1) (L1 2) Nil
+
+    describe "sek from +:" do
+      it "Ri 1 +: Ri 2 +: Ri 3 -> Sek (L1 1) (L1 2) (L1 3 : Nil)" do
+        let result = Ri 1 +: Ri 2 +: Ri 3 +: L0
+        result `shouldEqual` Sek (L1 (Ri 1)) (L1 (Ri 2)) (L1 (Ri 3) : Nil)
+      it "(Ri 1 +: L1 Ri 2) :+ Ri 3 -> Sek (L1 1) (L1 2) (L1 3 : Nil)" do
+        let result = (Ri 1 +: L1 (Ri 2)) :+ Ri 3
+        result `shouldEqual` Sek (L1 (Ri 1)) (L1 (Ri 2)) (L1 (Ri 3) : Nil)
+      it "(Ri 1 +: Ri 2 +: L1 Ri 3) :+ Ri 4 :+ Ri 5 -> Sek (L1 1) (L1 2) (L1 3 : L1 4 : L1 5 : Nil)" do
+        let result = (Ri 1 +: Ri 2 +: L1 (Ri 3)) :+ Ri 4 :+ Ri 5
+        result `shouldEqual` Sek (L1 (Ri 1)) (L1 (Ri 2)) (L1 (Ri 3) : L1 (Ri 4) : L1 (Ri 5) : Nil)
+      it "(Ri 1 +: Ri 2 +: L0) ::: (L0 :+ Ri 3 :+ Ri 4) -> Sek (Sek (L1 1) (L1 2) Nil) (Sek (L1 3) (L1 4) Nil) Nil" do
+        let result = (Ri 1 +: Ri 2 +: L0) ::: (L0 :+ Ri 3 :+ Ri 4)
+        result `shouldEqual` Sek (Sek (L1 (Ri 1)) (L1 (Ri 2)) Nil) (Sek (L1 (Ri 3)) (L1 (Ri 4)) Nil) Nil
+      it "1 +: L1 2 -> Sek (L1 1) (L1 2) Nil" do
+        let result = 1 +: L1 2
+        result `shouldEqual` Sek (L1 1) (L1 2) Nil
+      it "1 +: 2 +: L0 with right assoc -> Sek (L1 1) (L1 2) Nil" do
+        let result = 1 +: 2 +: L0
+        result `shouldEqual` Sek (L1 1) (L1 2) Nil
+      it "L0 :+ 1 :+ 2 with left assoc -> Sek (L1 1) (L1 2) Nil" do
+        let result = L0 :+ 1 :+ 2
+        result `shouldEqual` Sek (L1 1) (L1 2) Nil
+
+      it "(Sek (L1 1) (L1 2) Nil) <+ 3 -> combines to Bag" do
+        let result = 3 <+ (1 +: L1 2)
+        result `shouldEqual` Bag (L1 3) (Sek (L1 1) (L1 2) Nil) Nil
+
+      it "Pair (L1 a) (L1 b) <+ (c /\\ d) -> combines to Bagdict" do
+        let result = ((-3) /\ (-4)) <+ lem (((-1) /\ (-2)) : Nil)
+        result `shouldEqual` Dict (Tuple (L1 (-1)) (L1 (-2))) (Tuple (L1 (-3)) (L1 (-4))) Nil
     describe "lem for single value in list" do
       it "lem (1 : Nil) => L1 1" do
         let result = lem (1 : Nil)
@@ -112,29 +155,45 @@ spec = do
       result `shouldEqual` Sek (L1 1) (Pair (L1 (-1)) (L1 (-2))) Nil
 
   describe "Operator :+ (postpend)" do
-    it "L1 1 :+ 2 -> Sek (L1 2) (L1 1) Nil" do
+    it "L1 1 :+ 2 -> Sek (L1 1) (L1 2) Nil" do
       let result = L1 1 :+ 2
-      result `shouldEqual` Sek (L1 2) (L1 1) Nil
+      result `shouldEqual` Sek (L1 1) (L1 2) Nil
 
-    it "(Sek (L1 1) (L1 2) Nil) :+ 3 -> creates nested Sek" do
+    it "(Sek (L1 1) (L1 2) Nil) :+ 3 -> extends Sek" do
       let result = (1 +: L1 2) :+ 3
-      result `shouldEqual` Sek (L1 3) (Sek (L1 1) (L1 2) Nil) Nil
+      result `shouldEqual` Sek (L1 1) (L1 2) (L1 3 : Nil) 
 
     it "L1 1 :+ (2 /\\ 3) -> creates Sekdict" do
       let result = L1 1 :+ (2 /\ 3)
       result `shouldEqual` Sekdict (S1 (L1 1)) (D1 (L1 2) (L1 3))
 
+    it "Gap :+ 1 -> Sek Gap (L1 1) Nil" do
+      let result = Gap :+ 1
+      result `shouldEqual` Sek Gap (L1 1) Nil
+
+    it "Choice (L1 1) (L1 2) Nil :+ 3 -> Sek with Choice" do
+      let result = (L1 1 \/ L1 2) :+ 3
+      result `shouldEqual` Sek (L1 3) (Choice (L1 1) (L1 2) Nil) Nil
+
+    it "Pair (L1 a) (L1 b) :+ 1 -> Sek with Pair" do
+      let result = Pair (L1 (-1)) (L1 (-2)) :+ 1
+      result `shouldEqual` Sek (L1 1) (Pair (L1 (-1)) (L1 (-2))) Nil
+
+    it "L1 1 :+ L1 2 -> Sek (L1 2) (L1 1) Nil" do
+      let result = L1 1 :+ L1 2
+      result `shouldEqual` Sek (L1 2) (L1 1) Nil
+
   describe "Operator <+ (addPrimitive)" do
-    it "L1 1 <+ 2 -> Sek (L1 1) (L1 2) Nil" do
-      let result = L1 1 <+ 2
-      result `shouldEqual` Sek (L1 1) (L1 2) Nil
+    it "2 <+ L1 1 -> Bag (L1 2) (L1 1) Nil" do
+      let result = 2 <+ L1 1
+      result `shouldEqual` Bag (L1 2) (L1 1) Nil
 
     it "Sek (L1 1) (L1 2) Nil <+ 3 -> extends Sek" do
-      let result = (1 +: L1 2) <+ 3
-      result `shouldEqual` Sek (L1 1) (L1 2) (L1 3 : Nil)
+      let result = 3 <+ (1 +: L1 2)
+      result `shouldEqual` Bag (L1 3) (Sek (L1 1) (L1 2) Nil) Nil
 
     it "Pair (L1 a) (L1 b) <+ (c /\\ d) -> creates Dict" do
-      let result = lem (((-1) /\ (-2)) : Nil) <+ ((-3) /\ (-4))
+      let result = ((-3) /\ (-4)) <+ lem (((-1) /\ (-2)) : Nil)
       result `shouldEqual` Dict (Tuple (L1 (-1)) (L1 (-2))) (Tuple (L1 (-3)) (L1 (-4))) Nil
 
   describe "Operator <+> (combine)" do
@@ -172,17 +231,17 @@ spec = do
       result `shouldEqual` Sek (Pair (L1 1) (L1 2)) (Dict (Tuple (L1 (-1)) (L1 (-2))) (Tuple (L1 (-3)) (L1 (-4))) Nil) Nil
 
   describe "Chaining operators" do
-    it "1 +: (2 +: L1 3) -> nested Sek" do
+    it "1 +: (2 +: L1 3) -> flat Sek" do
       let result = 1 +: (2 +: L1 3)
-      result `shouldEqual` Sek (L1 1) (Sek (L1 2) (L1 3) Nil) Nil
+      result `shouldEqual` Sek (L1 1) (L1 2) (L1 3 : Nil)
 
     it "L1 1 ::: L1 2 ::: L1 3 -> left-associative nesting" do
       let result = L1 1 ::: L1 2 ::: L1 3
       result `shouldEqual` Sek (Sek (L1 1) (L1 2) Nil) (L1 3) Nil
 
-    it "L1 1 <+> L1 2 <+> L1 3 -> nested Bag" do
+    it "L1 1 <+> L1 2 <+> L1 3 -> flat Bag" do
       let result = L1 1 <+> L1 2 <+> L1 3
-      result `shouldEqual` Bag (Bag (L1 1) (L1 2) Nil) (L1 3) Nil
+      result `shouldEqual` Bag (L1 1) (L1 2) ((L1 3) : Nil)
 
   describe "Mixed operator combinations" do
     it "(1 +: L1 2) ::: (3 +: L1 4) -> nested Sek of Seks" do
@@ -190,7 +249,7 @@ spec = do
       result `shouldEqual` Sek (Sek (L1 1) (L1 2) Nil) (Sek (L1 3) (L1 4) Nil) Nil
 
     it "(L1 1 <+> L1 2) <+ 3 -> adds to existing Bag" do
-      let result = (L1 1 <+> L1 2) <+ 3
+      let result = 3 <+ (L1 1 <+> L1 2)
       result `shouldEqual` Bag (L1 1) (L1 2) (L1 3 : Nil)
 
   describe "Operator \\/ (or/choice)" do

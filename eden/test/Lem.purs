@@ -3,7 +3,7 @@ module Test.Lem where
 import Prelude
 
 import Data.List as List
-import Data.List.Types (List(..))
+import Data.List.Types (List(..), (:))
 import Data.Tuple.Nested ((/\))
 import Kubrick.Lem (Lem(..), (<+), (<+>), (+:), (:::), (:+))
 import Test.Spec (Spec, describe, it)
@@ -68,10 +68,9 @@ spec = do
           _ -> false `shouldEqual` true
 
     describe "Sek1 type" do
-      it "creates S2 with at least 2 elements using <+ operator" do
-        let sek = (L1 1 :: Lem Int) <+ 2 <+ 3 -- Creates Sek (internally S2)
-        -- Just verify it's a valid Sek (can't pattern match on S2 since it's hidden)
-        sek `shouldEqual` ((L1 1 :: Lem Int) <+ 2 <+ 3)
+      it "creates Bag with at least 2 elements using <+ operator" do
+        let bag = 3 <+ (2 <+ (L1 1 :: Lem Int)) -- Creates Bag
+        bag `shouldEqual` Bag (L1 3) (L1 2) (L1 1 : Nil)
 
       it "creates S1 with single element" do
         -- L1 42 is just L1 42, not a Sek
@@ -121,31 +120,31 @@ spec = do
 
     describe "<+ operator" do
       it "add el to L1" do
-        let result = (L1 1) <+ 2
-        result `shouldEqual` Sek (L1 1) (L1 2) Nil
+        let result = 2 <+ (L1 1)
+        result `shouldEqual` Bag (L1 2) (L1 1) Nil
 
       it "add element to Sek" do
-        let result = Sek (L1 1) (L1 2) Nil <+ 3
-        result `shouldEqual` Sek (L1 1) (L1 2) (List.singleton (L1 3))
+        let result = 3 <+ Sek (L1 1) (L1 2) Nil
+        result `shouldEqual` Bag (L1 3) (Sek (L1 1) (L1 2) Nil) Nil
 
       it "add element to Bag" do
-        let result = Bag (L1 1) (L1 2) Nil <+ 3
+        let result = 3 <+ Bag (L1 1) (L1 2) Nil
         result `shouldEqual` Bag (L1 1) (L1 2) (List.singleton (L1 3))
 
       it "add element to Choice" do
         let choice = Choice (L1 2) (L1 3) Nil
-        let result = choice <+ 1
+        let result = 1 <+ choice
         result `shouldEqual` Choice (L1 2) (L1 3) (List.singleton (L1 1))
 
     describe "<+> operator" do
       it "add pair to Pair" do
         let pair = Pair (L1 1) (L1 10)
-        let result = pair <+ (2 /\ 20)
+        let result = (2 /\ 20) <+ pair
         result `shouldEqual` Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil
 
       it "add pair to Dict" do
         let dict = Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil
-        let result = dict <+ (3 /\ 30)
+        let result = (3 /\ 30) <+ dict
         result `shouldEqual` Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) (List.singleton (L1 3 /\ L1 30))
 
       it "combine two L1 elements" do
@@ -256,7 +255,7 @@ spec = do
 
       it "prepend primitive to Sek" do
         let result = 1 +: Sek (L1 2) (L1 3) Nil
-        result `shouldEqual` Sek (L1 1) (Sek (L1 2) (L1 3) Nil) Nil
+        result `shouldEqual` Sek (L1 1) (L1 2) (L1 3 : Nil)
 
       it "prepend primitive to Bag" do
         let result = 1 +: Bag (L1 2) (L1 3) Nil
@@ -387,27 +386,15 @@ spec = do
     describe ":+ operator (postpend primitive)" do
       it "postpend primitive to L1" do
         let result = (L1 1) :+ 2
-        result `shouldEqual` Sek (L1 2) (L1 1) Nil
+        result `shouldEqual` Sek (L1 1) (L1 2) Nil
 
       it "postpend primitive to Sek" do
         let result = Sek (L1 1) (L1 2) Nil :+ 3
-        result `shouldEqual` Sek (L1 3) (Sek (L1 1) (L1 2) Nil) Nil
+        result `shouldEqual` Sek (L1 1) (L1 2) ((L1 3) : Nil)
 
       it "postpend primitive to Bag" do
         let result = Bag (L1 1) (L1 2) Nil :+ 3
-        result `shouldEqual` Sek (L1 3) (Bag (L1 1) (L1 2) Nil) Nil
-
-      --       it "postpend primitive to Choice" do
-      --         let result = Choice (L1 1) (L1 2) Nil :+ 3
-      --         result `shouldEqual` Sek (Choice (L1 1) (L1 2) Nil) (L1 3) Nil
-      -- 
-      --       it "postpend tuple to Pair" do
-      --         let result = Pair (L1 1) (L1 10) :+ (2 /\ 20)
-      --         result `shouldEqual` L1 (Pair (L1 1) (L1 10)) ::: Pair (L1 2) (L1 20)
-      -- 
-      --       it "postpend tuple to Dict" do
-      --         let result = Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil :+ (3 /\ 30)
-      --         result `shouldEqual` L1 (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil) ::: Pair (L1 3) (L1 30)
+        result `shouldEqual` Sek  (Bag (L1 1) (L1 2) Nil)(L1 3) Nil
 
       it "postpend tuple to Sek" do
         let result = Sek (L1 1) (L1 2) Nil :+ (3 /\ 30)

@@ -57,10 +57,10 @@ spec = do
       it "shows L1" do
         show (L1 42 :: Lem Int) `shouldEqual` "(L1 42)"
 
-      it "shows Sek created with <+ operator" do
-        let sek = ((L1 1) :: Lem Int) <+ 2 :: Lem Int
-        -- Sek internally contains S2, verify output contains "Sek"
-        show sek `shouldSatisfy` (String.contains (String.Pattern "Sek"))
+      it "shows Bag created with <+ operator" do
+        let bag = 2 <+ ((L1 1) :: Lem Int) :: Lem Int
+        -- Bag internally contains B2, verify output contains "Bag"
+        show bag `shouldSatisfy` (String.contains (String.Pattern "Bag"))
 
       it "shows Bag created with <+> operator" do
         let bag = (L1 1 :: Lem Int) <+> (L1 2)

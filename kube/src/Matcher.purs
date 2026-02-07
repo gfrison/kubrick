@@ -18,6 +18,10 @@ import Kubrick.Types (Raw)
 Match returns all Kids that satisfy the input Lem (partial, non-strict matching).
 
 Input → Matches:
+• Gap -> if it is a Sek it will match with anything existing at that position
+• Gap -> if it is in a Bag/Choice it will match with anything existing in keys more than 
+ - what it is already matching. ex: if there are 2 strict elements and a Gap, 
+ - it will match with anything that has at least those 2 elements plus one other element.
 • L1 a → L1(a) | Sek starting with a | Bag/Choice containing a
 • Sek [a,b,..] → Sek/Sekdict with prefix [a,b,..]
 • Bag {a,b,..} → Bag/Choice/[Bag|Choice]dict containing {a,b,..} as subset
@@ -31,14 +35,15 @@ Non-Dict elements use AND logic. Choice elements use OR logic.
 match :: Kube -> Lem Raw -> List Kid
 match kube query = case query of
   L0 -> mempty
+  Gap -> matchGap kube  -- Gap matches everything with 1 element
   L1 a -> matchL1 a kube
   Sek lem1 lem2 rest -> matchSek (Sek lem1 lem2 rest) kube
   Bag lem1 lem2 rest -> matchBag (Bag lem1 lem2 rest) kube
-  Choice lem1 lem2 rest -> concat $ fromFoldable 
-    [ match kube lem1
-    , match kube lem2
-    , concat $ fromFoldable $ map (\l -> match kube l) rest
-    ]
+  Choice lem1 lem2 rest -> 
+    let results = Set.fromFoldable (match kube lem1)
+                <> Set.fromFoldable (match kube lem2)
+                <> foldl (<>) Set.empty (map (\l -> Set.fromFoldable (match kube l)) rest)
+    in toList results
   Pair lem1 lem2 -> matchPair lem1 lem2 kube
   Dict pair1 pair2 rest -> matchDict (Dict pair1 pair2 rest) kube
   Bagdict _ dict -> matchDict' dict kube
@@ -65,6 +70,10 @@ isBagOrChoice kid kube = Set.isEmpty (getKeys kube.vals kid)
 getParentKids :: Kid -> Kube -> Set Kid
 getParentKids pairKid kube = getValues kube.refKeys pairKid
 
+-- Match Gap: returns all roots
+matchGap :: Kube -> List Kid
+matchGap kube = toList kube.roots
+
 matchL1 :: Raw -> Kube -> List Kid
 matchL1 a kube = toList matches
   where
@@ -85,18 +94,59 @@ matchL1 a kube = toList matches
 
 matchSek :: Lem Raw -> Kube -> List Kid
 matchSek sek kube = 
-  if allL1 sek
-    then matchSekL1 sek kube
+  if allL1OrGap sek
+    then matchSekL1WithGap sek kube
     else matchSekComposite sek kube
   where
-    allL1 (Sek l1 l2 rest) = isL1 l1 && isL1 l2 && all isL1 rest
-    allL1 _ = false
-    isL1 (L1 _) = true
-    isL1 _ = false
+    allL1OrGap (Sek l1 l2 rest) = isL1OrGap l1 && isL1OrGap l2 && all isL1OrGap rest
+    allL1OrGap _ = false
+    isL1OrGap (L1 _) = true
+    isL1OrGap Gap = true
+    isL1OrGap _ = false
 
--- Match Sek with only L1 elements
+-- Match Sek with only L1 elements (and possibly Gap)
+matchSekL1WithGap :: Lem Raw -> Kube -> List Kid
+matchSekL1WithGap sek kube = toList $ matchSekL1WithGapCore sek kube true
+
+-- Legacy function for backward compatibility
 matchSekL1 :: Lem Raw -> Kube -> List Kid
 matchSekL1 sek kube = toList $ matchSekL1Core sek kube true
+
+-- Core Sek L1 matching with Gap support
+matchSekL1WithGapCore :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchSekL1WithGapCore sek kube withRootsFilter = allMatches
+  where
+    elements = collectElementsWithGap sek
+    numElements = Array.length elements
+    
+    -- Get candidates from first non-Gap element
+    candidates = findFirstNonGapCandidates elements kube
+    
+    -- Check if Kid has matching elements at positions (Gap matches anything)
+    hasPrefix kid = go 0
+      where
+        go idx 
+          | idx >= numElements = true
+          | otherwise = case Array.index elements idx of
+              Just (Just elem) -> case getSeqBiAt idx kube of
+                Just getVals -> 
+                  if Set.member kid (getVals elem)
+                    then go (idx + 1)
+                    else false
+                Nothing -> false
+              Just Nothing -> -- Gap at this position - check anything exists
+                case getSeqBiAt idx kube of
+                  Just _ -> go (idx + 1) -- Position exists, Gap matches
+                  Nothing -> false -- Position doesn't exist
+              Nothing -> false
+    
+    directMatches = Set.filter hasPrefix candidates
+    
+    allMatches = if withRootsFilter
+      then
+        let parentMatches = findParentSeks (Set.toUnfoldable directMatches :: Array Kid) kube
+        in Set.filter (\k -> Set.member k kube.roots) (Set.union directMatches parentMatches)
+      else directMatches
 
 -- Core Sek L1 matching with optional roots filtering and parent discovery
 matchSekL1Core :: Lem Raw -> Kube -> Boolean -> Set Kid
@@ -203,6 +253,7 @@ matchSekCompositeCore sek kube withRootsFilter = allMatches
 matchDirect :: Lem Raw -> Kube -> Set Kid
 matchDirect query kube = case query of
   L0 -> Set.empty
+  Gap -> Set.empty
   L1 a -> matchL1Direct a kube
   Sek lem1 lem2 rest -> 
     if allL1Sek (Sek lem1 lem2 rest)
@@ -262,20 +313,116 @@ collectElements = collect []
     collect acc (Choice l1 l2 rest) = foldl collect (collect (collect acc l1) l2) rest
     collect acc _ = acc
 
+-- Collect elements with Gap (Nothing = Gap, Just Raw = L1)
+collectElementsWithGap :: Lem Raw -> Array (Maybe Raw)
+collectElementsWithGap = collect []
+  where
+    collect acc (L1 a) = Array.snoc acc (Just a)
+    collect acc Gap = Array.snoc acc Nothing
+    collect acc (Sek l1 l2 rest) = foldl collect (collect (collect acc l1) l2) rest
+    collect acc (Bag l1 l2 rest) = foldl collect (collect (collect acc l1) l2) rest
+    collect acc (Choice l1 l2 rest) = foldl collect (collect (collect acc l1) l2) rest
+    collect acc _ = acc
+
+-- Find candidates from first non-Gap element at its position
+findFirstNonGapCandidates :: Array (Maybe Raw) -> Kube -> Set Kid
+findFirstNonGapCandidates elements kube = go 0
+  where
+    numElements = Array.length elements
+    go idx
+      | idx >= numElements = 
+          -- All Gaps - need to find all Kids with at least numElements positions
+          -- Get all Kids that appear at position 0
+          case Array.index kube.seqs 0 of
+            Just bi ->
+              let allKidsAtPos0 = foldl (\acc raw -> Set.union acc (getValues bi raw)) Set.empty getAllRawValues
+                  getAllRawValues = []  -- We need all possible Raw values, but we don't have them
+                  -- Instead, we filter roots by checking if they have enough positions
+              in Set.filter (hasEnoughPositions (numElements - 1)) kube.roots
+            Nothing -> Set.empty
+      | otherwise = case Array.index elements idx of
+          Just (Just elem) -> case getSeqBiAt idx kube of
+            Just getVals -> getVals elem
+            Nothing -> Set.empty
+          Just Nothing -> go (idx + 1) -- Skip Gap, try next
+          Nothing -> Set.empty
+    
+    -- Check if Kid has positions up to maxPos
+    hasEnoughPositions maxPos kid = checkPos 0
+      where
+        checkPos pos
+          | pos > maxPos = true
+          | otherwise = case Array.index kube.refSeqs pos of
+              Just refBi -> 
+                -- Check if this kid has any entry at this position
+                not Set.isEmpty (getKeys refBi kid) || checkDataPos pos
+              Nothing -> checkDataPos pos
+        
+        checkDataPos pos = case Array.index kube.seqs pos of
+          Just dataBi ->
+            not Set.isEmpty (getKeys dataBi kid)
+          Nothing -> false
+
 matchBag :: Lem Raw -> Kube -> List Kid
 matchBag bag kube = 
-  if allL1 bag
-    then matchBagL1 bag kube
+  if allL1OrGap bag
+    then matchBagL1WithGap bag kube
     else matchBagComposite bag kube
   where
-    allL1 (Bag l1 l2 rest) = isL1 l1 && isL1 l2 && all isL1 rest
-    allL1 _ = false
-    isL1 (L1 _) = true
-    isL1 _ = false
+    allL1OrGap (Bag l1 l2 rest) = isL1OrGap l1 && isL1OrGap l2 && all isL1OrGap rest
+    allL1OrGap _ = false
+    isL1OrGap (L1 _) = true
+    isL1OrGap Gap = true
+    isL1OrGap _ = false
+
+-- Match Bag with L1 and Gap elements
+matchBagL1WithGap :: Lem Raw -> Kube -> List Kid
+matchBagL1WithGap bag kube = toList $ matchBagL1WithGapCore bag kube true
 
 -- Match Bag with only L1 elements
 matchBagL1 :: Lem Raw -> Kube -> List Kid
 matchBagL1 bag kube = toList $ matchBagL1Core bag kube true
+
+-- Core Bag L1 with Gap matching - Gap means at least one more element
+matchBagL1WithGapCore :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchBagL1WithGapCore bag kube withRootsFilter = allMatches
+  where
+    allElements = collectElementsWithGap bag
+    elements = Array.mapMaybe identity allElements -- Filter out Gaps to get L1 elements
+    numGaps = Array.length $ Array.filter (\x -> x == Nothing) allElements
+    
+    -- Get candidates from first element, or all keys if only Gaps
+    candidates = case Array.head elements of
+      Just firstElem -> getValues kube.keys firstElem
+      Nothing -> 
+        -- All Gaps - get all Bag/Choice Kids (those in keys but not vals)
+        Set.filter (\k -> isBagOrChoice k kube) kube.roots
+    
+    -- Check if Kid has all bag elements plus at least as many extra as there are Gaps
+    containsAll kid = 
+      let kidKeys = getKeys kube.keys kid
+          numKidKeys = Set.size kidKeys
+          numRequiredElements = Array.length elements
+          minTotalRequired = numRequiredElements + numGaps
+          hasAllElements = go 0
+            where
+              go idx
+                | idx >= numRequiredElements = true
+                | otherwise = case Array.index elements idx of
+                    Just elem -> 
+                      if Set.member kid (getValues kube.keys elem)
+                        then go (idx + 1)
+                        else false
+                    Nothing -> false
+      in hasAllElements && numKidKeys >= minTotalRequired
+    
+    directMatches = Set.filter containsAll candidates
+    
+    allMatches = if withRootsFilter
+      then
+        let parentMatches = findParentBags (Set.toUnfoldable directMatches :: Array Kid) kube
+        in Set.filter (\k -> Set.member k kube.roots) (Set.union directMatches parentMatches)
+      else directMatches
 
 -- Core Bag L1 matching with optional roots filtering and parent discovery
 matchBagL1Core :: Lem Raw -> Kube -> Boolean -> Set Kid

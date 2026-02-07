@@ -6,7 +6,6 @@ import Kubrick.Kube (Kid(..), Kube, bi0)
 import Kubrick.Getter as Getter
 import Data.List (List(Nil))
 import Data.Set as Set
-import Data.Tuple.Nested ((/\))
 import Data.Maybe (Maybe(..))
 import Kubrick.Types (Raw(..))
 import Kubrick.Lem (Lem(..), (<+>), (<+), (+:), (\/))
@@ -187,7 +186,7 @@ spec = do
                }
         result = Getter.get kube (Kid 1)
         sek = (Ri 1) +:   ((Ri 2) +: L0)
-        expected = sek <+ (Ri 3)
+        expected = (Ri 3) <+ sek
       result `shouldEqual` (Just expected)
 
     it "sek + choice" do

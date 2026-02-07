@@ -11,23 +11,23 @@ spec :: Spec Unit
 spec = do
   describe "bag uniqueness" do
     it "preserves all unique elements" do
-      -- <+> creates nested Bags
+      -- <+> now creates flat Bags
       let bag = L1 1 <+> L1 2 <+> L1 3
-      bag `shouldEqual` Bag (Bag (L1 1) (L1 2) Nil) (L1 3) Nil
+      bag `shouldEqual` Bag (L1 1) (L1 2) (Cons (L1 3) Nil)
 
     it "removes duplicates and collapses to L1 when only one unique element" do
       let bag = L1 1 <+> L1 1 <+> L1 1
       bag `shouldEqual` L1 1
 
     it "removes duplicates and keeps two unique elements" do
-      -- <+> creates nested Bags
+      -- <+> now creates flat Bags with uniqueness
       let bag = L1 1 <+> L1 2 <+> L1 1 <+> L1 2
-      bag `shouldEqual` Bag (Bag (Bag (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 2) Nil
+      bag `shouldEqual` Bag (L1 1) (L1 2) Nil
 
     it "removes duplicates from mixed positions" do
-      -- <+> creates nested Bags
+      -- <+> now creates flat Bags with uniqueness
       let bag = L1 1 <+> L1 2 <+> L1 2 <+> L1 3
-      bag `shouldEqual` Bag (Bag (Bag (L1 1) (L1 2) Nil) (L1 2) Nil) (L1 3) Nil
+      bag `shouldEqual` Bag (L1 1) (L1 2) (Cons (L1 3) Nil)
 
   describe "choice uniqueness" do
     it "preserves all unique elements" do

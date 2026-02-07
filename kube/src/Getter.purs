@@ -10,6 +10,7 @@ import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Set as Set
+import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Kubrick.Lem (Lem(..), (<+>), (<+))
 import Kubrick.Kube.Types (Kid, Bi, Kube, getKeys)
@@ -50,7 +51,7 @@ reconstructLem visited kid kube
 -- | If the key-val is a simple value (L1), append it to the sequence
 -- | Otherwise, combine as a Bag
 combineSekWithKeyVal :: Lem Raw -> Lem Raw -> Lem Raw
-combineSekWithKeyVal sek (L1 value) = sek <+ value  -- Append to sequence
+combineSekWithKeyVal sek (L1 value) = value <+ sek  -- Prepend to create Bag
 combineSekWithKeyVal sek kvLem = sek <+> kvLem      -- Combine as Bag
 
 -- | Reconstruct sequence (Sek) from seqs array
@@ -138,24 +139,63 @@ reconstructKeyVal visited kid kube =
     allValLems = valDataLems <> valRefLems
   in
     case Array.length allKeyLems /\ Array.length allValLems of
-      -- Has both keys and vals -> Pair
+      -- Has both keys and vals -> Pair or Dict
       kl /\ vl | kl > 0 && vl > 0 -> reconstructPairFromLems allKeyLems allValLems
       
-      -- Only keys, is a set -> Bag
-      kl /\ 0 | kl > 0 && isSet -> reconstructBagFromLems allKeyLems
-      
-      -- Only keys, not a set -> Choice
-      kl /\ 0 | kl > 0 -> reconstructChoiceFromLems allKeyLems
+      -- Only keys - check if they're all Pairs (Dict case)
+      kl /\ 0 | kl > 0 ->
+        case extractPairs allKeyLems of
+          Just pairs -> reconstructDictFromPairs pairs
+          Nothing ->
+            -- Not all Pairs, check if it's a set
+            if isSet
+              then reconstructBagFromLems allKeyLems
+              else reconstructChoiceFromLems allKeyLems
       
       -- No data
       _ -> Nothing
 
--- | Reconstruct a Pair from Lems
+-- | Extract key-value tuples from Pair Lems
+extractPairs :: Array (Lem Raw) -> Maybe (Array (Tuple (Lem Raw) (Lem Raw)))
+extractPairs lems =
+  let extracted = lems <#> \lem -> case lem of
+        Pair k v -> Just (Tuple k v)
+        _ -> Nothing
+  in if Array.all (\x -> case x of
+                          Just _ -> true
+                          Nothing -> false) extracted
+     then Just (Array.mapMaybe identity extracted)
+     else Nothing
+
+-- | Reconstruct a Dict from an array of key-value tuples
+reconstructDictFromPairs :: Array (Tuple (Lem Raw) (Lem Raw)) -> Maybe (Lem Raw)
+reconstructDictFromPairs pairs =
+  case Array.uncons pairs of
+    Nothing -> Nothing
+    Just { head: t1, tail } ->
+      case Array.uncons tail of
+        Nothing -> case t1 of
+          Tuple k v -> Just (Pair k v)
+        Just { head: t2, tail: rest } ->
+          Just (Dict t1 t2 (List.fromFoldable rest))
+
+-- | Reconstruct a Pair or Dict from Lems
 reconstructPairFromLems :: Array (Lem Raw) -> Array (Lem Raw) -> Maybe (Lem Raw)
-reconstructPairFromLems keyLems valLems =
-  case Array.head keyLems /\ Array.head valLems of
-    Just keyLem /\ Just valLem -> Just (Pair keyLem valLem)
-    _ -> Nothing
+reconstructPairFromLems keyLems valLems
+  | Array.length keyLems /= Array.length valLems = Nothing
+  | otherwise =
+      case Array.zip keyLems valLems of
+        [] -> Nothing
+        [Tuple k v] -> Just (Pair k v)
+        pairs ->
+          case Array.uncons pairs of
+            Nothing -> Nothing
+            Just { head: Tuple k1 v1, tail } ->
+              case Array.uncons tail of
+                Nothing -> Just (Pair k1 v1)
+                Just { head: Tuple k2 v2, tail: rest } ->
+                  let tuples = rest <#> \(Tuple k v) -> Tuple k v
+                  in Just (Dict (Tuple k1 v1) (Tuple k2 v2) (List.fromFoldable tuples))
 
 -- | Reconstruct a Bag from Lems
 reconstructBagFromLems :: Array (Lem Raw) -> Maybe (Lem Raw)

@@ -8,12 +8,13 @@ import Data.List (List(..), (:))
 import Data.List.Lazy as LazyList
 import Data.Maybe (Maybe(..))
 import Data.Set as Set
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Kube (Kid(..), Kube, addM, addFrom, (+>), emptyKube)
+import Kubrick.Kube (Kid(..), Kube, addM, (+>), emptyKube)
 import Kubrick.Matcher (match)
 import Kubrick.Types (Raw(..))
-import Kubrick.Lem (Lem(..), Bag1(..), Dict1(..), (<+>), (\/), (<+), (+:), lem)
+import Kubrick.Lem (Lem(..), Bag1(..), Dict1(..), (<+>), (\/), (<+), (+:), (:+), lem)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -24,14 +25,11 @@ addLem l = runState (addM l) (Tuple (Kid 0) emptyKube)
 -- Helper to build Kube with multiple Lems and get their Kids
 addMultiple :: Array (Lem Raw) -> { kids :: Array Kid, kube :: Tuple Kid Kube }
 addMultiple lems = 
-  let result = Array.foldl 
-        (\acc l -> 
-          let newKube /\ newNextKid = (acc.kube /\ acc.nextKid) +> l
-          in { kids: acc.kids <> [acc.nextKid], kube: newKube, nextKid: newNextKid }
-        )
-        { kids: [], kube: emptyKube, nextKid: Kid 0 }
-        lems
-  in { kids: result.kids, kube: Tuple result.nextKid result.kube }
+  let 
+    Tuple kids finalState = runState 
+      (traverse (\l -> addM l) lems)
+      (Tuple (Kid 0) emptyKube)
+  in { kids: kids, kube: finalState }
 
 spec :: Spec Unit
 spec = do
@@ -46,15 +44,15 @@ spec = do
 
     it "L1 matches Sek head (position 0)" do
       let
-        Tuple kid (Tuple _ kube) = addLem ((Rs "a") +:   ((Rs "b") +:   ((Rs "c") +:   L0)))
+        Tuple kid (Tuple _ kube) = addLem (Rs "a" +: Rs "b" +: Rs "c" +: L0)
         result = match kube (L1 (Rs "a"))
       LazyList.length result `shouldEqual` 1
       Set.member kid (Set.fromFoldable result) `shouldEqual` true
 
     it "L1 does NOT match Sek at position > 0" do
       let
-        -- Create flat Sek with Sek constructor to avoid nested structure
-        Tuple _ (Tuple _ kube) = addLem (Sek (L1 (Rs "a")) (L1 (Rs "b")) ((L1 (Rs "c")) : Nil))
+        -- Create flat Sek with <+ operator
+        Tuple _ (Tuple _ kube) = addLem (Rs "a" +: Rs "b" +: Rs "c" +: L0)
         result = match kube (L1 (Rs "b"))
       LazyList.length result `shouldEqual` 0
 
@@ -90,7 +88,7 @@ spec = do
     it "Sek matches exact Sek" do
       let
         query :: Lem Raw
-        query = (Rs "a") +: ((Rs "b") +: L0)
+        query = Rs "a" +: Rs "b" +: L0
         Tuple kid (Tuple _ kube) = addLem query
         result = match kube query
       LazyList.length result `shouldEqual` 1
@@ -99,8 +97,8 @@ spec = do
     it "Sek matches longer Sek (prefix)" do
       let
         query :: Lem Raw
-        query = (Rs "a") +:   ((Rs "b") +:   L0)
-        Tuple kid (Tuple _ kube) = addLem (Sek (L1 (Rs "a")) (L1 (Rs "b")) ((L1 (Rs "c")) : Nil))
+        query = Rs "a" +: Rs "b" +: L0
+        Tuple kid (Tuple _ kube) = addLem (Rs "a" +: Rs "b" +: Rs "c" +: L0)
         result = match kube query
       LazyList.length result `shouldEqual` 1
       Set.member kid (Set.fromFoldable result) `shouldEqual` true
@@ -108,23 +106,23 @@ spec = do
     it "Sek does NOT match if not prefix" do
       let
         query :: Lem Raw
-        query = (Rs "b") +:   ((Rs "c") +:   L0)
-        Tuple _ (Tuple _ kube) = addLem (Sek (L1 (Rs "a")) (L1 (Rs "b")) ((L1 (Rs "c")) : Nil))
+        query = Rs "b" +: Rs "c" +: L0
+        Tuple _ (Tuple _ kube) = addLem (Rs "a" +: Rs "b" +: Rs "c" +: L0)
         result = match kube query
       LazyList.length result `shouldEqual` 0
 
     it "Sek does NOT match shorter Sek" do
       let
         query :: Lem Raw
-        query = (Rs "a") +:   ((Rs "b") +:   ((Rs "c") +:   L0))
-        Tuple _ (Tuple _ kube) = addLem ((Rs "a") +:   ((Rs "b") +:   L0))
+        query = Rs "a" +: Rs "b" +: Rs "c" +: L0
+        Tuple _ (Tuple _ kube) = addLem (Rs "a" +: Rs "b" +: L0)
         result = match kube query
       LazyList.length result `shouldEqual` 0
 
     it "Sek matches Sekdict with matching prefix" do
       let
         sek :: Lem Raw
-        sek = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek = Rs "a" +: Rs "b" +: L0
         pair = lem (((Rs "k") /\ (Rs "v")) : Nil)
         Tuple kid (Tuple _ kube) = addLem (sek +: pair)
         result = match kube sek
@@ -200,9 +198,9 @@ spec = do
     it "Choice with Sek alternatives" do
       let
         sek1 :: Lem Raw
-        sek1 = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek1 = Rs "a" +: Rs "b" +: L0
         sek2 :: Lem Raw
-        sek2 = (Rs "c") +:   ((Rs "d") +:   L0)
+        sek2 = Rs "c" +: Rs "d" +: L0
         { kids, kube: Tuple _ kubeData } = addMultiple [sek1, sek2]
         query :: Lem Raw
         query = sek1 \/ sek2
@@ -229,7 +227,7 @@ spec = do
       let
         query :: Lem Raw
         query = lem (((Rs "k1") /\ (Rs "v1")) : Nil)
-        Tuple kid (Tuple _ kube) = addLem (lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2")))
+        Tuple kid (Tuple _ kube) = addLem (((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil))
         result = match kube query
       LazyList.length result `shouldEqual` 1
       Set.member kid (Set.fromFoldable result) `shouldEqual` true
@@ -237,8 +235,8 @@ spec = do
     it "Pair matches Sekdict containing it in Dict part" do
       let
         sek :: Lem Raw
-        sek = (Rs "a") +:   ((Rs "b") +:   L0)
-        dict = lem (((Rs "k") /\ (Rs "v")) : Nil) <+ ((Rs "k2") /\ (Rs "v2"))
+        sek = Rs "a" +: Rs "b" +: L0
+        dict = ((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k") /\ (Rs "v")) : Nil)
         query :: Lem Raw
         query = lem (((Rs "k") /\ (Rs "v")) : Nil)
         Tuple kid (Tuple _ kube) = addLem (sek +: dict)
@@ -279,7 +277,7 @@ spec = do
     it "Dict matches exact Dict" do
       let
         query :: Lem Raw
-        query = lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2"))
+        query = ((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil)
         Tuple kid (Tuple _ kube) = addLem query
         result = match kube query
       LazyList.length result `shouldEqual` 1
@@ -288,8 +286,8 @@ spec = do
     it "Dict matches superset Dict" do
       let
         query :: Lem Raw
-        query = lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2"))
-        Tuple kid (Tuple _ kube) = addLem (lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2")) <+ ((Rs "k3") /\ (Rs "v3")))
+        query = ((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil)
+        Tuple kid (Tuple _ kube) = addLem (((Rs "k3") /\ (Rs "v3")) <+ (((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil)))
         result = match kube query
       LazyList.length result `shouldEqual` 1
       Set.member kid (Set.fromFoldable result) `shouldEqual` true
@@ -297,7 +295,7 @@ spec = do
     it "Dict does NOT match if missing pairs" do
       let
         query :: Lem Raw
-        query = lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2"))
+        query = ((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil)
         Tuple _ (Tuple _ kube) = addLem (lem (((Rs "k1") /\ (Rs "v1")) : Nil))
         result = match kube query
       LazyList.length result `shouldEqual` 0
@@ -305,10 +303,10 @@ spec = do
     it "Dict matches Sekdict containing all pairs" do
       let
         sek :: Lem Raw
-        sek = (Rs "a") +:   ((Rs "b") +:   L0)
-        dict = lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2"))
+        sek = Rs "a" +: Rs "b" +: L0
+        dict = ((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil)
         query :: Lem Raw
-        query = lem (((Rs "k1") /\ (Rs "v1")) : Nil) <+ ((Rs "k2") /\ (Rs "v2"))
+        query = ((Rs "k2") /\ (Rs "v2")) <+ lem (((Rs "k1") /\ (Rs "v1")) : Nil)
         Tuple kid (Tuple _ kube) = addLem (sek +: dict)
         result = match kube query
       LazyList.length result `shouldEqual` 1
@@ -316,7 +314,7 @@ spec = do
 
     it "Dict matches Bagdict containing all pairs" do
       let
-        -- Create Bagdict directly: Bagdict (Bag part) (Dict part)
+        -- Create Bagdict directly: no operator available for Bag <+> Dict
         bag :: Bag1 Raw
         bag = B2 (L1 (Rs "a")) (L1 (Rs "b")) Nil
         dict :: Dict1 Raw
@@ -334,14 +332,14 @@ spec = do
     it "Query matches multiple different Kids" do
       let
         sek1 :: Lem Raw
-        sek1 = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek1 = Rs "a" +: Rs "b" +: L0
         sek2 :: Lem Raw
-        sek2 = Sek (L1 (Rs "a")) (L1 (Rs "b")) ((L1 (Rs "c")) : Nil)
+        sek2 = Rs "a" +: Rs "b" +: Rs "c" +: L0
         sek3 :: Lem Raw
-        sek3 = Sek (L1 (Rs "a")) (L1 (Rs "b")) ((L1 (Rs "d")) : Nil)
+        sek3 = Rs "a" +: Rs "b" +: Rs "d" +: L0
         { kids, kube: Tuple _ kubeData } = addMultiple [sek1, sek2, sek3]
         query :: Lem Raw
-        query = (Rs "a") +:   ((Rs "b") +:   L0)
+        query = Rs "a" +: Rs "b" +: L0
         result = match kubeData query
         getKid arr idx = case Array.index arr idx of
           Just x -> x
@@ -355,7 +353,7 @@ spec = do
     it "L1 matches multiple structures containing it" do
       let
         sek :: Lem Raw
-        sek = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek = Rs "a" +: Rs "b" +: L0
         bag :: Lem Raw
         bag = L1 (Rs "a") <+> L1 (Rs "b")
         choice :: Lem Raw
@@ -383,8 +381,8 @@ spec = do
     it "Returns empty when Sek prefix doesn't match" do
       let
         query :: Lem Raw
-        query = (Rs "x") +:   ((Rs "y") +:   L0)
-        Tuple _ (Tuple _ kube) = addLem ((Rs "a") +:   ((Rs "b") +:   L0))
+        query = Rs "x" +: Rs "y" +: L0
+        Tuple _ (Tuple _ kube) = addLem (Rs "a" +: Rs "b" +: L0)
         result = match kube query
       LazyList.length result `shouldEqual` 0
 
@@ -423,11 +421,11 @@ spec = do
     it "Nested Sek matching" do
       let
         sek1 :: Lem Raw
-        sek1 = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek1 = Rs "a" +: Rs "b" +: L0
         sek2 :: Lem Raw
-        sek2 = (Rs "c") +:   ((Rs "d") +:   L0)
+        sek2 = Rs "c" +: Rs "d" +: L0
         outer :: Lem Raw
-        outer = Sek sek1 sek2 Nil
+        outer = sek1 +: (sek2 +: L0)
         Tuple kid (Tuple _ kube) = addLem outer
         result = match kube sek1
       -- The outer Sek starts with sek1 at position 0
@@ -437,13 +435,13 @@ spec = do
     it "Bag with nested Lems" do
       let
         sek1 :: Lem Raw
-        sek1 = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek1 = Rs "a" +: Rs "b" +: L0
         sek2 :: Lem Raw
-        sek2 = (Rs "c") +:   ((Rs "d") +:   L0)
+        sek2 = Rs "c" +: Rs "d" +: L0
         bag :: Lem Raw
-        bag = Bag sek1 sek2 (Cons (L1 (Rs "e")) Nil)
+        bag = sek1 <+> sek2 <+> L1 (Rs "e")
         query :: Lem Raw
-        query = Bag sek1 sek2 Nil
+        query = sek1 <+> sek2
         Tuple kid (Tuple _ kube) = addLem bag
         result = match kube query
       LazyList.length result `shouldEqual` 1
@@ -454,7 +452,7 @@ spec = do
         pair :: Lem Raw
         pair = lem (((Rs "k1") /\ (Rs "v1")) : Nil)
         sek :: Lem Raw
-        sek = (Rs "a") +:   ((Rs "b") +:   L0)
+        sek = Rs "a" +: Rs "b" +: L0
         { kids, kube: Tuple _ kubeData } = addMultiple [pair, sek]
         query :: Lem Raw
         query = pair \/ sek
@@ -466,4 +464,172 @@ spec = do
       LazyList.length result `shouldEqual` 2
       Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
       Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+
+  describe "Matcher - Gap matching" do
+    
+    it "Gap alone matches all roots" do
+      let
+        { kids, kube: Tuple _ kubeData } = addMultiple 
+          [ L1 (Rs "a")
+          , Rs "b" +: Rs "c" +: L0
+          , L1 (Rs "d") <+> L1 (Rs "e")
+          ]
+        result = match kubeData Gap
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Should match all roots
+      LazyList.length result `shouldEqual` 3
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 2) (Set.fromFoldable result) `shouldEqual` true
+
+    it "Gap in Sek matches any element at that position" do
+      let
+        sek1 :: Lem Raw
+        sek1 = Rs "a" +: Rs "b" +: Rs "c" +: L0
+        sek2 :: Lem Raw
+        sek2 = Rs "a" +: Rs "x" +: Rs "c" +: L0
+        sek3 :: Lem Raw
+        sek3 = Rs "a" +: Rs "y" +: Rs "c" +: L0
+        { kids, kube: Tuple _ kubeData } = addMultiple [sek1, sek2, sek3]
+        query :: Lem Raw
+        query = Sek (L1 (Rs "a")) Gap ((L1 (Rs "c")) : Nil)
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Should match all three Seks (Gap matches "b", "x", "y")
+      LazyList.length result `shouldEqual` 3
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 2) (Set.fromFoldable result) `shouldEqual` true
+
+    it "Gap at position 0 in Sek matches any first element" do
+      let
+        sek1 :: Lem Raw
+        sek1 = Rs "a" +: Rs "b" +: L0
+        sek2 :: Lem Raw
+        sek2 = Rs "x" +: Rs "b" +: L0
+        sek3 :: Lem Raw
+        sek3 = Rs "y" +: Rs "b" +: L0
+        { kids, kube: Tuple _ kubeData } = addMultiple [sek1, sek2, sek3]
+        query :: Lem Raw
+        query = (Gap :: Lem Raw) +: Rs "b" +: L0
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Should match all three Seks
+      LazyList.length result `shouldEqual` 3
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 2) (Set.fromFoldable result) `shouldEqual` true
+
+    it "Multiple Gaps in Sek" do
+      let
+        sek1 :: Lem Raw
+        sek1 = Rs "a" +: Rs "b" +: Rs "c" +: L0
+        sek2 :: Lem Raw
+        sek2 = Rs "a" +: Rs "x" +: Rs "c" +: L0
+        { kids, kube: Tuple _ kubeData } = addMultiple [sek1, sek2]
+        query :: Lem Raw
+        query = Sek Gap Gap (Gap : Nil)
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Should match both (all positions can be anything)
+      LazyList.length result `shouldEqual` 2
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+
+    it "Gap in Bag matches bags with at least one more element" do
+      let
+        bag1 :: Lem Raw
+        bag1 = L1 (Rs "a") <+> L1 (Rs "b") <+> L1 (Rs "c")
+        bag2 :: Lem Raw
+        bag2 = L1 (Rs "a") <+> L1 (Rs "b") <+> L1 (Rs "d")
+        bag3 :: Lem Raw
+        bag3 = L1 (Rs "a") <+> L1 (Rs "b") -- Only has the specified elements
+        { kids, kube: Tuple _ kubeData } = addMultiple [bag1, bag2, bag3]
+        query :: Lem Raw
+        query = L1 (Rs "a") <+> L1 (Rs "b") <+> (Gap :: Lem Raw)
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Should match bag1 and bag2 (have "a", "b", and one more), but NOT bag3
+      LazyList.length result `shouldEqual` 2
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 2) (Set.fromFoldable result) `shouldEqual` false
+
+    it "Gap in Bag with multiple elements requires correct count" do
+      let
+        bag1 :: Lem Raw
+        bag1 = L1 (Rs "a") <+> L1 (Rs "b")
+        bag2 :: Lem Raw
+        bag2 = L1 (Rs "a") <+> L1 (Rs "b") <+> L1 (Rs "c")
+        bag3 :: Lem Raw
+        bag3 = L1 (Rs "a") <+> L1 (Rs "b") <+> L1 (Rs "c") <+> L1 (Rs "d")
+        { kids, kube: Tuple _ kubeData } = addMultiple [bag1, bag2, bag3]
+        query :: Lem Raw
+        query = Bag (L1 (Rs "a")) Gap (Gap : Nil)  -- "a" + 2 other elements
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- bag1 has only 2 elements total (not > 1 specified)
+      -- bag2 has 3 elements ("a" + 2 others: "b", "c")
+      -- bag3 has 4 elements ("a" + 3 others: "b", "c", "d")
+      LazyList.length result `shouldEqual` 2
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` false
+      Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true
+      Set.member (getKid kids 2) (Set.fromFoldable result) `shouldEqual` true
+
+    it "Gap in Choice matches via individual alternatives" do
+      let
+        choice1 :: Lem Raw
+        choice1 = L1 (Rs "a") \/ L1 (Rs "b") \/ L1 (Rs "c")
+        { kids, kube: Tuple _ kubeData } = addMultiple [choice1]
+        query :: Lem Raw
+        query = L1 (Rs "a") \/ L1 (Rs "b") \/ (Gap :: Lem Raw)
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Choice uses OR logic, so this works like normal choice matching
+      -- The Gap in the query choice means match "a" OR "b" OR (anything with 1 element)
+      LazyList.length result `shouldEqual` 1
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
+
+    it "Sek does NOT match if Gap position doesn't exist" do
+      let
+        sek :: Lem Raw
+        sek = (Rs "a") +: ((Rs "b") +: L0)  -- Only 2 elements
+        Tuple _ (Tuple _ kube) = addLem sek
+        query :: Lem Raw
+        query = Sek (L1 (Rs "a")) (L1 (Rs "b")) (Gap : Nil)  -- Requires 3 elements
+        result = match kube query
+      -- Should NOT match (Gap needs position 2 to exist)
+      LazyList.length result `shouldEqual` 0
+
+    it "Gap in Sek with mixed L1 and Gap" do
+      let
+        sek1 :: Lem Raw
+        sek1 = Rs "a" +: Rs "b" +: Rs "c" +: Rs "d" +: L0
+        sek2 :: Lem Raw
+        sek2 = Rs "a" +: Rs "y" +: Rs "c" +: Rs "e" +: L0
+        { kids, kube: Tuple _ kubeData } = addMultiple [sek1, sek2]
+        query :: Lem Raw
+        query = Sek (L1 (Rs "a")) Gap ((L1 (Rs "c")) : Gap : Nil)
+        result = match kubeData query
+        getKid arr idx = case Array.index arr idx of
+          Just x -> x
+          Nothing -> Kid (-1)
+      -- Should match both: pos0="a", pos1=anything, pos2="c", pos3=anything
+      LazyList.length result `shouldEqual` 2
+      Set.member (getKid kids 0) (Set.fromFoldable result) `shouldEqual` true
       Set.member (getKid kids 1) (Set.fromFoldable result) `shouldEqual` true

@@ -5,7 +5,7 @@ import Prelude
 import Data.List ((:))
 import Data.List.Types (List(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Lem(..), (<+), (<+>), (\/), lem)
+import Kubrick.Lem (Bag1(..), Dict1(..), Lem(..), (<+), (<+>), (\/), lem)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldNotEqual)
 
@@ -39,11 +39,11 @@ spec = do
       it "direct construction allows duplicates in different positions" do
         let
           badBag = Bag (L1 1) (L1 2) (L1 1 : L1 2 : Nil) -- 1 and 2 appear twice each
-          -- <+> operator creates nested Bags when chained
+          -- <+> operator now creates flat Bags with deduplication
           goodBag = L1 1 <+> L1 2 <+> L1 1 <+> L1 2
 
-        -- Operator deduplicates within each Bag it creates
-        goodBag `shouldEqual` Bag (Bag (Bag (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 2) Nil
+        -- Operator deduplicates, creating flat Bag with unique elements
+        goodBag `shouldEqual` Bag (L1 1) (L1 2) Nil
 
         -- Direct construction keeps duplicates
         badBag `shouldNotEqual` goodBag
@@ -121,7 +121,7 @@ spec = do
         let
           badDict = Dict (L1 1 /\ L1 10) (L1 1 /\ L1 20) Nil -- Key "1" appears twice!
           goodDict :: Lem Int
-          goodDict = lem ((1 /\ 10) : Nil) <+ (1 /\ 20)
+          goodDict = (1 /\ 20) <+ lem ((1 /\ 10) : Nil)
 
         -- Operator removes duplicate keys (keeps first occurrence)
         goodDict `shouldEqual` Pair (L1 1) (L1 10)
@@ -133,7 +133,7 @@ spec = do
         let
           badDict = Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) ((L1 1 /\ L1 30) : Nil)
           goodDict :: Lem Int
-          goodDict = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30)
+          goodDict = (1 /\ 30) <+ ((2 /\ 20) <+ lem ((1 /\ 10) : Nil))
 
         -- Operator keeps only first occurrence of each key
         goodDict `shouldEqual` Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil
@@ -144,9 +144,9 @@ spec = do
       it "dict enforces key uniqueness" do
         let
           dict1 :: Lem Int
-          dict1 = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30)
+          dict1 = (1 /\ 30) <+ ((2 /\ 20) <+ lem ((1 /\ 10) : Nil))
           dict2 :: Lem Int
-          dict2 = lem ((2 /\ 20) : Nil) <+ (1 /\ 10)
+          dict2 = (1 /\ 10) <+ lem ((2 /\ 20) : Nil)
 
         -- Both should have unique keys {1, 2} regardless of order
         dict1 `shouldEqual` dict2
@@ -155,9 +155,9 @@ spec = do
         let pair :: Lem Int
             pair = lem ((1 /\ 100) : Nil)
         let result :: Lem Int
-            result = pair <+ (1 /\ 200) -- Same key 1
+            result = (1 /\ 20) <+ ((1 /\ 10) <+ pair)
 
-        -- Should have only one entry for key 1 (the first one)
+        -- Creates Pair because all keys are the same (collapses to single pair)
         result `shouldEqual` Pair (L1 1) (L1 100)
 
     describe "D2 key uniqueness enforcement" do
@@ -165,7 +165,7 @@ spec = do
         let
           -- Using <+ operator enforces uniqueness by collapsing to single key/value pair
           result :: Lem Int
-          result = lem ((1 /\ 10) : Nil) <+ (1 /\ 20)
+          result = (1 /\ 20) <+ lem ((1 /\ 10) : Nil)
 
         -- Operator with duplicate keys collapses to single Pair
         result `shouldEqual` Pair (L1 1) (L1 10)
@@ -173,9 +173,9 @@ spec = do
       it "<+ operator enforces key uniqueness" do
         let
           d2a :: Lem Int
-          d2a = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30)
+          d2a = (1 /\ 30) <+ ((2 /\ 20) <+ lem ((1 /\ 10) : Nil))
           d2b :: Lem Int
-          d2b = lem ((2 /\ 20) : Nil) <+ (1 /\ 10)
+          d2b = (1 /\ 10) <+ lem ((2 /\ 20) : Nil)
 
         -- Should have unique keys {1, 2}
         d2a `shouldEqual` d2b
@@ -183,14 +183,14 @@ spec = do
     describe "Dict/D2 correct usage" do
       it "<+ operator handles all duplicate keys correctly" do
         let allSame :: Lem Int
-            allSame = lem ((1 /\ 10) : Nil) <+ (1 /\ 20) <+ (1 /\ 30)
+            allSame = (1 /\ 30) <+ ((1 /\ 20) <+ lem ((1 /\ 10) : Nil))
         allSame `shouldEqual` Pair (L1 1) (L1 10)
 
       it "<+ operator handles partial duplicate keys correctly" do
         let someDups :: Lem Int
-            someDups = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (1 /\ 30) <+ (3 /\ 40)
+            someDups = (3 /\ 40) <+ ((1 /\ 30) <+ ((2 /\ 20) <+ lem ((1 /\ 10) : Nil)))
         let expected :: Lem Int
-            expected = lem ((1 /\ 10) : Nil) <+ (2 /\ 20) <+ (3 /\ 40)
+            expected = (3 /\ 40) <+ ((2 /\ 20) <+ lem ((1 /\ 10) : Nil))
         someDups `shouldEqual` expected
 
 {-

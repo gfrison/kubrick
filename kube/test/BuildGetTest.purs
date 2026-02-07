@@ -2,7 +2,7 @@ module Test.BuildGetTest where
 
 import Prelude hiding (add)
 
-import Kubrick.Kube (Kid(..), Kube, emptyKube, addM)
+import Kubrick.Kube (Kid(..), emptyKube, addM)
 import Kubrick.Getter as Getter
 import Control.Monad.State (runState)
 import Data.List ((:), List(Nil))
@@ -57,14 +57,14 @@ spec = do
         result = Getter.get kube kid
       result `shouldEqual` (Just original)
 
-    it "reconstructs Dict as Bagdict (Dict doesn't preserve structure)" do
+    it "reconstructs Dict correctly (Dict now preserves structure)" do
       let
-        -- Dict creates a dictionary, but round-trip changes it to Bagdict
-        original = lem (((Ri 1000) /\ (Ri 1100)) : Nil) <+ ((Ri 2000) /\ (Ri 2200))
+        -- Dict creates a dictionary and round-trip preserves it as Dict
+        original = ((Ri 2000) /\ (Ri 2200)) <+ lem (((Ri 1000) /\ (Ri 1100)) : Nil)
         Tuple kid (Tuple _ kube) = runState (addM original) (Tuple (Kid 0) (emptyKube))
         result = Getter.get kube kid
-        -- Expect Bagdict, not Dict - this is what Getter reconstructs
-        expected = Bagdict (B1 (Pair (L1 (Ri 2000)) (L1 (Ri 2200)))) (D1 (L1 (Ri 1000)) (L1 (Ri 1100)))
+        -- Expect Dict to be preserved
+        expected = Dict (Tuple (L1 (Ri 1000)) (L1 (Ri 1100))) (Tuple (L1 (Ri 2000)) (L1 (Ri 2200))) Nil
       result `shouldEqual` (Just expected)
 
     it "reconstructs Choice with simple elements" do
@@ -106,12 +106,12 @@ spec = do
         expected = Choice (L1 (Ri 7000)) (L1 (Ri 7001)) (L1 (Ri 7002) : Nil)
       result `shouldEqual` (Just expected)
 
-    it "Dict with 3+ pairs becomes Bag structure on round-trip" do
+    it "Dict with 3+ pairs preserves Dict structure on round-trip" do
       let
-        -- Dict with 3+ pairs doesn't preserve as Dict
-        original = lem (((Ri 10) /\ (Ri 20)) : Nil) <+ ((Ri 30) /\ (Ri 40)) <+ ((Ri 50) /\ (Ri 60))
+        -- Dict with 3+ pairs now preserves as Dict
+        original = ((Ri 50) /\ (Ri 60)) <+ (((Ri 30) /\ (Ri 40)) <+ lem (((Ri 10) /\ (Ri 20)) : Nil))
         Tuple kid (Tuple _ kube) = runState (addM original) (Tuple (Kid 0) (emptyKube))
         result = Getter.get kube kid
-        -- Expect Bag structure, not Dict
-        expected = Bag (Bagdict (B1 (Pair (L1 (Ri 30)) (L1 (Ri 40)))) (D1 (L1 (Ri 10)) (L1 (Ri 20)))) (Pair (L1 (Ri 50)) (L1 (Ri 60))) Nil
+        -- Expect Dict to be preserved
+        expected = Dict (Tuple (L1 (Ri 10)) (L1 (Ri 20))) (Tuple (L1 (Ri 30)) (L1 (Ri 40))) ((Tuple (L1 (Ri 50)) (L1 (Ri 60))) : Nil)
       result `shouldEqual` (Just expected)
