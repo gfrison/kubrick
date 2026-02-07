@@ -1,11 +1,15 @@
 module Kubrick.Kube
-  ( add
-  , addFrom
+  ( (+)
+  , (+*)
+  , (+>)
+  , add
   , addAll
+  , addFrom
   , addM
   , get
   , match
-  , module Kubrick.Kube.Types, (+), (+>), (+*)
+  , module Kubrick.Kube.Types
+  , fill
   )
   where
 
@@ -13,6 +17,7 @@ import Prelude
 
 import Control.Monad.State (State, runState)
 import Data.Array as Array
+import Data.Either (Either)
 import Data.Foldable (class Foldable, foldl)
 import Data.List.Lazy (List)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -26,7 +31,7 @@ import Kubrick.Kube.Types (Kid(..), Bi, Kube, bi0, emptyKube)
 import Kubrick.Lem (Lem)
 import Kubrick.Matcher as Matcher
 import Kubrick.Reticolo (Reticolo(..))
-import Kubrick.Searcher as Searcher
+import Kubrick.Filler as Filler
 import Kubrick.Types (Raw,Vid,Term)
 
 -- | Add a Lem to a Kube starting with Kid 0
@@ -65,5 +70,5 @@ get = Getter.get
 match :: Kube -> Lem Raw -> List Kid 
 match = Matcher.match
 
-search :: Kube -> Lem Term -> Reticolo Vid
-search = Searcher.search
+fill :: Kube -> Kid -> Lem Term -> Either String (Reticolo Vid)
+fill = Filler.fill

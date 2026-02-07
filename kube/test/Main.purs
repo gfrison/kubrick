@@ -8,7 +8,7 @@ import Test.BuildGetTest as BuildGetTest
 import Test.Kube.BuilderTest as BuilderTest
 import Test.Kube.MatcherTest as MatcherTest
 import Test.Kube.MonadTest as MonadTest
-import Test.Kube.SearcherTest as SearcherTest
+import Test.Kube.FillerTest as FillerTest
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] do
@@ -16,4 +16,4 @@ main = runSpecAndExitProcess [ consoleReporter ] do
   BuildGetTest.spec
   BuilderTest.spec
   MatcherTest.spec
-  SearcherTest.spec
+  FillerTest.spec

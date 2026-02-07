@@ -1,4 +1,4 @@
-module Test.Kube.SearcherTest where
+module Test.Kube.FillerTest where
 
 import Prelude
 
@@ -12,7 +12,7 @@ import Data.Maybe (Maybe(..))
 import Kubrick.Kube (Kid(..), add)
 import Kubrick.Kube.Types (emptyKube)
 import Kubrick.Lem (Lem(..), (+:), (<+), (<+>), (:::), lem)
-import Kubrick.Searcher (fill)
+import Kubrick.Filler (fill)
 import Kubrick.Types (Raw(..), Vid(..), Term(..))
 import Kubrick.Reticolo as Reticolo
 import Test.Spec (Spec, describe, it)
