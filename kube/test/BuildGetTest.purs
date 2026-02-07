@@ -10,7 +10,7 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Kubrick.Types (Raw(..))
-import Kubrick.Lem (Lem(..), (+:), (<+), (\/), Bag1(..), Dict1(..), lem)
+import Kubrick.Lem (Lem(..), (+:), (<+), (\/), lem)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 

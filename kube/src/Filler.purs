@@ -12,8 +12,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Kubrick.Getter as Getter
 import Kubrick.Kube.Types (Kid, Kube)
-import Kubrick.Lem (Lem(..), Dict1(..), Sek1(..), Bag1(..))
-import Kubrick.Matcher (match)
+import Kubrick.Lem (Lem(..))
 import Kubrick.Reticolo (Reticolo)
 import Kubrick.Reticolo as Reticolo
 import Kubrick.Types (Raw, Term(..), Vid, RawType(..))

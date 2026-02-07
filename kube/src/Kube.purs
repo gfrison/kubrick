@@ -18,10 +18,9 @@ import Prelude
 import Control.Monad.State (State, runState)
 import Data.Array as Array
 import Data.Either (Either)
-import Data.Foldable (class Foldable, foldl)
+import Data.Foldable (class Foldable)
 import Data.List.Lazy (List)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String.Regex (search)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
@@ -30,7 +29,7 @@ import Kubrick.Getter as Getter
 import Kubrick.Kube.Types (Kid(..), Bi, Kube, bi0, emptyKube)
 import Kubrick.Lem (Lem)
 import Kubrick.Matcher as Matcher
-import Kubrick.Reticolo (Reticolo(..))
+import Kubrick.Reticolo (Reticolo)
 import Kubrick.Filler as Filler
 import Kubrick.Types (Raw,Vid,Term)
 
@@ -41,7 +40,7 @@ add kube lem = addFrom (kube /\ Kid 0) lem
 -- | Add a Lem to a Kube starting from a specific Kid
 addFrom :: (Kube /\ Kid) -> Lem Raw -> (Kube /\ Kid)
 addFrom (kube /\ startKid) lem = 
-  let Tuple insertedKid (Tuple nextKid newKube) = runState (Builder.add lem) (Tuple startKid kube)
+  let Tuple insertedKid (Tuple _ newKube) = runState (Builder.add lem) (Tuple startKid kube)
   in newKube /\ insertedKid
 
 -- | Add multiple Lems to a Kube, returns the Kube and the last Kid added
