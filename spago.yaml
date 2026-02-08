@@ -11,6 +11,7 @@ package:
     - effect
     - kubrick-eden
     - kubrick-kube
+    - kubrick-ayn
     - prelude
   test:
     main: Test.Main

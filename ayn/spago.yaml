@@ -1,0 +1,24 @@
+package:
+  name: kubrick-ayn
+  dependencies:
+    - arrays
+    - console
+    - effect
+    - either
+    - foldable-traversable
+    - kubrick-eden
+    - lists
+    - maybe
+    - prelude
+    - spec-node
+    - strings
+    - transformers
+    - tuples
+  test:
+    main: Test.Ayn.Main
+    dependencies:
+      - aff
+      - spec
+  publish:
+    version: 0.1.0
+    license: MIT
