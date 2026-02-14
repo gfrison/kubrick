@@ -31,15 +31,15 @@ spec = do
 
   describe "choice uniqueness" do
     it "preserves all unique elements" do
-      -- \/ creates nested Choices
-      let choice = L1 "a" \/ L1 "b" \/ L1 "c"
-      choice `shouldEqual` Choice (Choice (L1 "a") (L1 "b") Nil) (L1 "c") Nil
+      -- \/ creates flattened Choices
+      let choice = (L1 "a" :: Lem String) \/ (L1 "b" :: Lem String) \/ (L1 "c" :: Lem String)
+      choice `shouldEqual` Choice (L1 "a") (L1 "b") (Cons (L1 "c") Nil)
 
     it "removes duplicates and collapses to L1 when only one unique element" do
-      let choice = L1 "a" \/ L1 "a"
+      let choice = (L1 "a" :: Lem String) \/ (L1 "a" :: Lem String)
       choice `shouldEqual` L1 "a"
 
     it "removes duplicates and keeps two unique elements" do
-      -- \/ creates nested Choices
-      let choice = L1 "x" \/ L1 "y" \/ L1 "x" \/ L1 "y"
-      choice `shouldEqual` Choice (Choice (Choice (L1 "x") (L1 "y") Nil) (L1 "x") Nil) (L1 "y") Nil
+      -- \/ creates flattened Choices with duplicates removed
+      let choice = (L1 "x" :: Lem String) \/ (L1 "y" :: Lem String) \/ (L1 "x" :: Lem String) \/ (L1 "y" :: Lem String)
+      choice `shouldEqual` Choice (L1 "x") (L1 "y") Nil

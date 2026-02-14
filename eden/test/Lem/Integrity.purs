@@ -57,20 +57,20 @@ spec = do
       it "direct construction with duplicates breaks integrity" do
         let
           badChoice = Choice (L1 "a") (L1 "a") (L1 "a" : Nil)
-          goodChoice = L1 "a" \/ L1 "a" \/ L1 "a"
+          goodChoice = (L1 "a" :: Lem String) \/ (L1 "a" :: Lem String) \/ (L1 "a" :: Lem String)
 
         goodChoice `shouldEqual` (L1 "a")
         badChoice `shouldNotEqual` goodChoice
 
       it "choice enforces uniqueness" do
         let
-          -- \/ operator creates nested Choice structures when chained
-          choice1 = L1 1 \/ L1 2 \/ L1 1 \/ L1 3
-          choice2 = L1 3 \/ L1 2 \/ L1 1
+          -- \/ operator creates flattened Choice structures when chained
+          choice1 = (L1 1 :: Lem Int) \/ (L1 2 :: Lem Int) \/ (L1 1 :: Lem Int) \/ (L1 3 :: Lem Int)
+          choice2 = (L1 3 :: Lem Int) \/ (L1 2 :: Lem Int) \/ (L1 1 :: Lem Int)
 
-        -- Both should deduplicate within their structures
-        choice1 `shouldEqual` Choice (Choice (Choice (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 3) Nil
-        choice2 `shouldEqual` Choice (Choice (L1 3) (L1 2) Nil) (L1 1) Nil
+        -- Both should deduplicate within their flattened structures
+        choice1 `shouldEqual` Choice (L1 1) (L1 2) (Cons (L1 3) Nil)
+        choice2 `shouldEqual` Choice (L1 3) (L1 2) (Cons (L1 1) Nil)
 
     describe "Correct usage with operators" do
       it "<+> operator enforces uniqueness automatically" do
@@ -89,9 +89,9 @@ spec = do
         allSame `shouldEqual` (L1 42)
 
       it "choice handles partial duplicates correctly" do
-        -- \/ operator creates nested structures
-        let someDups = L1 1 \/ L1 2 \/ L1 1 \/ L1 3 \/ L1 2
-        let expected = Choice (Choice (Choice (Choice (L1 1) (L1 2) Nil) (L1 1) Nil) (L1 3) Nil) (L1 2) Nil
+        -- \/ operator creates flattened structures with duplicates removed
+        let someDups = (L1 1 :: Lem Int) \/ (L1 2 :: Lem Int) \/ (L1 1 :: Lem Int) \/ (L1 3 :: Lem Int) \/ (L1 2 :: Lem Int)
+        let expected = Choice (L1 1) (L1 2) (Cons (L1 3) Nil)
         someDups `shouldEqual` expected
 
     describe "What NOT to do (documented violations)" do

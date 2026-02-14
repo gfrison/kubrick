@@ -108,13 +108,40 @@ bag fst snd rest = bagLem (L1 fst) (L1 snd) (map L1 rest)
 choiceLem :: forall t. Eq t => Lem t -> Lem t -> List (Lem t) -> Lem t
 choiceLem fst snd rest =
   let
-    allElems = fst : snd : rest
+    -- Flatten if fst is a Choice
+    fstElems = case fst of
+      Choice f s r -> f : s : r
+      other -> other : Nil
+    -- Flatten if snd is a Choice
+    sndElems = case snd of
+      Choice f s r -> f : s : r
+      other -> other : Nil
+    -- Combine all elements
+    allElems = fstElems <> sndElems <> rest
     unique = List.nubByEq (==) allElems
   in
     case unique of
       f : s : r -> Choice f s r
       f : Nil -> f
       _ -> L0
+class Or s t u | s t -> u where
+  or :: Eq u => s -> t -> Lem u
+
+-- Both Lem values  
+instance orLemLem :: Eq t => Or (Lem t) (Lem t) t where
+  or lem L0 = lem
+  or L0 lem = lem
+  or (a :: Lem t) (b :: Lem t) = choiceLem a b Nil
+else instance orLemPrimitive :: Eq t => Or (Lem t) t t where
+  or (L0) (p :: t) = L1 p
+  or (lem :: Lem t) (p :: t) = choiceLem lem (L1 p) Nil
+else instance orPrimitiveLem :: Eq t => Or t (Lem t) t where
+  or (p :: t) (L0) = L1 p
+  or (p :: t) (lem :: Lem t) = choiceLem (L1 p) lem Nil
+
+-- Both primitives
+else instance orPrimitivePrimitive :: Eq t => Or t t t where
+  or (p1 :: t) (p2 :: t) = choiceLem (L1 p1) (L1 p2) Nil
 
 -- Internal helper for Dict that works with Lem values
 dictLem :: forall t. Eq t => Tuple (Lem t) (Lem t) -> Tuple (Lem t) (Lem t) -> List (Tuple (Lem t) (Lem t)) -> Lem t
@@ -307,14 +334,6 @@ instance combineLem :: Eq t => CombineLem t where
   combine lem Gap = bagLem lem Gap Nil
   combine lem1 lem2 = bagLem lem1 lem2 Nil
 
-class Or s t where
-  or :: Eq t => s -> Lem t -> Lem t
-
-instance orLem :: Eq t => Or (Lem t) t where
-  or lem L0 = lem
-  or a b = choiceLem a b Nil
-else instance orPrimitive :: Eq t => Or t t where
-  or p lem = choiceLem (L1 p) lem Nil
 
 -- ** Infix Operators
 
