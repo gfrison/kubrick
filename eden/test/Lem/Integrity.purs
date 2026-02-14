@@ -5,7 +5,7 @@ import Prelude
 import Data.List ((:))
 import Data.List.Types (List(..))
 import Data.Tuple.Nested ((/\))
-import Kubrick.Lem (Bag1(..), Dict1(..), Lem(..), (<+), (<+>), (\/), lem)
+import Kubrick.Lem (Lem(..), (<+), (<+>), (\/), lem)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldNotEqual)
 

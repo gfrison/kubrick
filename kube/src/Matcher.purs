@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Foldable (foldl, all)
-import Data.List.Lazy (List, fromFoldable, concat)
+import Data.List.Lazy (List, fromFoldable)
 import Data.Maybe (Maybe(..))
 import Data.Set (Set)
 import Data.Set as Set
@@ -108,9 +108,9 @@ matchSek sek kube =
 matchSekL1WithGap :: Lem Raw -> Kube -> List Kid
 matchSekL1WithGap sek kube = toList $ matchSekL1WithGapCore sek kube true
 
--- Legacy function for backward compatibility
-matchSekL1 :: Lem Raw -> Kube -> List Kid
-matchSekL1 sek kube = toList $ matchSekL1Core sek kube true
+-- Legacy function for backward compatibility (kept for potential future use)
+_matchSekL1 :: Lem Raw -> Kube -> List Kid
+_matchSekL1 sek kube = toList $ matchSekL1Core sek kube true
 
 -- Core Sek L1 matching with Gap support
 matchSekL1WithGapCore :: Lem Raw -> Kube -> Boolean -> Set Kid
@@ -335,7 +335,7 @@ findFirstNonGapCandidates elements kube = go 0
           -- Get all Kids that appear at position 0
           case Array.index kube.seqs 0 of
             Just bi ->
-              let allKidsAtPos0 = foldl (\acc raw -> Set.union acc (getValues bi raw)) Set.empty getAllRawValues
+              let _allKidsAtPos0 = foldl (\acc raw -> Set.union acc (getValues bi raw)) Set.empty getAllRawValues
                   getAllRawValues = []  -- We need all possible Raw values, but we don't have them
                   -- Instead, we filter roots by checking if they have enough positions
               in Set.filter (hasEnoughPositions (numElements - 1)) kube.roots
@@ -379,9 +379,9 @@ matchBag bag kube =
 matchBagL1WithGap :: Lem Raw -> Kube -> List Kid
 matchBagL1WithGap bag kube = toList $ matchBagL1WithGapCore bag kube true
 
--- Match Bag with only L1 elements
-matchBagL1 :: Lem Raw -> Kube -> List Kid
-matchBagL1 bag kube = toList $ matchBagL1Core bag kube true
+-- Match Bag with only L1 elements (kept for potential future use)
+_matchBagL1 :: Lem Raw -> Kube -> List Kid
+_matchBagL1 bag kube = toList $ matchBagL1Core bag kube true
 
 -- Core Bag L1 with Gap matching - Gap means at least one more element
 matchBagL1WithGapCore :: Lem Raw -> Kube -> Boolean -> Set Kid

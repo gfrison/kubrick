@@ -150,12 +150,12 @@ parseLemFromTokens tokens = do
   
   parseSequence :: List String -> List (Lem Raw) -> Either String { lem :: Lem Raw, rest :: List String }
   parseSequence Nil acc = do
-    lem <- constructFromAcc acc Sek
-    pure { lem, rest: Nil }
+    value <- constructFromAcc acc Sek
+    pure { lem: value, rest: Nil }
   parseSequence tokens@(tok : rest) acc
     | tok == "," = do
-        lem <- constructFromAcc acc Sek
-        pure { lem, rest: tokens }
+        value <- constructFromAcc acc Sek
+        pure { lem: value, rest: tokens }
     | tok == "->" =
         case List.reverse acc of
           Nil -> Left "Empty before ->"
@@ -180,9 +180,9 @@ parseLemFromTokens tokens = do
     case primResult.rest of
       (";") : restTokens -> parseChoiceAtTopLevel restTokens (primResult.lem : acc)
       _ -> do
-        lem <- constructFromAcc (primResult.lem : acc) Choice
-        case lem of
-          Choice _ _ _ -> pure { lem, rest: primResult.rest }
+        value <- constructFromAcc (primResult.lem : acc) Choice
+        case value of
+          Choice _ _ _ -> pure { lem: value, rest: primResult.rest }
           _ -> Left "Choice needs at least 2 elements"
   
   parsePrimary :: List String -> Either String { lem :: Lem Raw, rest :: List String }
@@ -222,8 +222,8 @@ parseLemFromTokens tokens = do
     parseContents _ Nil = Left "Unclosed ("
     parseContents acc tokens@(tok : tokRest)
       | tok == closingToken = do
-          lem <- constructFromAcc acc Sek
-          pure { lem, rest: tokRest }
+          value <- constructFromAcc acc Sek
+          pure { lem: value, rest: tokRest }
       | tok == ";" = 
           case List.reverse acc of
             Nil -> Left "Empty before ;"

@@ -99,11 +99,6 @@ bagLem fst snd rest =
       f : Nil -> f
       _ -> L0
 
--- | Smart constructor for Bag that ensures uniqueness
--- | Takes primitive values and wraps them in L1
-bag :: forall t. Eq t => t -> t -> List t -> Lem t
-bag fst snd rest = bagLem (L1 fst) (L1 snd) (map L1 rest)
-
 -- Internal helper for Choice that works with Lem values
 choiceLem :: forall t. Eq t => Lem t -> Lem t -> List (Lem t) -> Lem t
 choiceLem fst snd rest =
@@ -166,19 +161,6 @@ dict fst snd rest =
   in
     dictLem (wrapPair fst) (wrapPair snd) (map wrapPair rest)
 
--- Internal helper for D2 that works with Lem values
-d2Lem :: forall t. Eq t => Tuple (Lem t) (Lem t) -> Tuple (Lem t) (Lem t) -> List (Tuple (Lem t) (Lem t)) -> Dict1 t
-d2Lem fst snd rest =
-  let
-    allPairs = fst : snd : rest
-    -- Remove duplicates based on key (first element of Tuple)
-    unique = List.nubByEq (\(Tuple k1 _) (Tuple k2 _) -> k1 == k2) allPairs
-  in
-    case unique of
-      f : s : r -> D2 f s r
-      f : Nil -> case f of
-        Tuple k v -> D1 k v
-      _ -> D1 L0 L0 -- Should not happen, but needed for totality
 
 -- * Polymorphic Constructor
 
@@ -236,25 +218,25 @@ else instance preTuple :: Eq t => PrePrimitive t (Tuple t t) where
 else instance prependLem :: Eq t => PrePrimitive t (Lem t) where
   prependPrimitive (Sek x y rest) (L1 z) = Sek (L1 z) x (y : rest)
   prependPrimitive (Sek a b c) (Sek fst snd rest) = Sek a b (c <> (fst : snd : rest))
-  prependPrimitive (Sekdict sek dict) (Sek fst snd rest) = Sekdict
+  prependPrimitive (Sekdict sek dict') (Sek fst snd rest) = Sekdict
     ( case sek of
         S2 f s r -> S2 f s (r <> (fst : snd : rest))
         S1 l -> S2 l fst (snd : rest)
     )
-    dict
-  prependPrimitive (Sek a b c) (Sekdict sek dict) = Sekdict
+    dict'
+  prependPrimitive (Sek a b c) (Sekdict sek dict') = Sekdict
     ( case sek of
         S2 f s r -> S2 a b (c <> (f : s : r))
         S1 l -> S2 a b (c <> (l : Nil))
     )
-    dict
+    dict'
   prependPrimitive lem (Sek fst snd rest) = Sek lem fst (snd : rest)
-  prependPrimitive lem (Sekdict sek dict) = Sekdict
+  prependPrimitive lem (Sekdict sek dictParam) = Sekdict
     ( case sek of
         S2 fst snd rest -> S2 lem fst (snd : rest)
         S1 l -> S2 lem l Nil
     )
-    dict
+    dictParam
   prependPrimitive lem (L1 y) = Sek lem (L1 y) Nil
   prependPrimitive lem Gap = Sek lem Gap Nil
   prependPrimitive Gap lem = Sek Gap lem Nil
@@ -490,12 +472,12 @@ instance functorLem :: Functor Lem where
       mapTuple (Tuple k v) = Tuple (map f k) (map f v)
     in
       Dict (mapTuple fst) (mapTuple snd) (map mapTuple rest)
-  map f (Sekdict sek dict) =
+  map f (Sekdict sek dictParam) =
     let
       sek' = case sek of
         S1 lem -> S1 (map f lem)
         S2 fst' snd' rest' -> S2 (map f fst') (map f snd') (map (map f) rest')
-      dict' = case dict of
+      dict' = case dictParam of
         D1 k v -> D1 (map f k) (map f v)
         D2 fst' snd' rest' ->
           let
@@ -504,12 +486,12 @@ instance functorLem :: Functor Lem where
             D2 (mapTuple fst') (mapTuple snd') (map mapTuple rest')
     in
       Sekdict sek' dict'
-  map f (Bagdict bag dict) =
+  map f (Bagdict bag dictParam) =
     let
       bag' = case bag of
         B1 lem -> B1 (map f lem)
         B2 fst' snd' rest' -> B2 (map f fst') (map f snd') (map (map f) rest')
-      dict' = case dict of
+      dict' = case dictParam of
         D1 k v -> D1 (map f k) (map f v)
         D2 fst' snd' rest' ->
           let
@@ -532,12 +514,12 @@ instance foldableLem :: Foldable Lem where
       foldTuple (Tuple k v) acc = foldr f (foldr f acc v) k
     in
       foldTuple fst (foldTuple snd (foldr foldTuple z rest))
-  foldr f z (Sekdict sek dict) =
+  foldr f z (Sekdict sek dictParam) =
     let
       zSek = case sek of
         S1 lem -> foldr f z lem
         S2 fst snd rest -> foldr f (foldr f (foldr (flip (foldr f)) z rest) snd) fst
-      zDict = case dict of
+      zDict = case dictParam of
         D1 k v -> foldr f (foldr f zSek v) k
         D2 fst snd rest ->
           let
@@ -546,12 +528,12 @@ instance foldableLem :: Foldable Lem where
             foldTuple fst (foldTuple snd (foldr foldTuple zSek rest))
     in
       zDict
-  foldr f z (Bagdict bag dict) =
+  foldr f z (Bagdict bag dictParam) =
     let
       zBag = case bag of
         B1 lem -> foldr f z lem
         B2 fst snd rest -> foldr f (foldr f (foldr (flip (foldr f)) z rest) snd) fst
-      zDict = case dict of
+      zDict = case dictParam of
         D1 k v -> foldr f (foldr f zBag v) k
         D2 fst snd rest ->
           let
@@ -573,12 +555,12 @@ instance foldableLem :: Foldable Lem where
       foldTuple acc (Tuple k v) = foldl f (foldl f acc k) v
     in
       foldl foldTuple (foldTuple (foldTuple z fst) snd) rest
-  foldl f z (Sekdict sek dict) =
+  foldl f z (Sekdict sek dictParam) =
     let
       zSek = case sek of
         S1 lem -> foldl f z lem
         S2 fst snd rest -> foldl (foldl f) (foldl f (foldl f z fst) snd) rest
-      zDict = case dict of
+      zDict = case dictParam of
         D1 k v -> foldl f (foldl f zSek k) v
         D2 fst snd rest ->
           let
@@ -587,12 +569,12 @@ instance foldableLem :: Foldable Lem where
             foldl foldTuple (foldTuple (foldTuple zSek fst) snd) rest
     in
       zDict
-  foldl f z (Bagdict bag dict) =
+  foldl f z (Bagdict bag dictParam) =
     let
       zBag = case bag of
         B1 lem -> foldl f z lem
         B2 fst snd rest -> foldl (foldl f) (foldl f (foldl f z fst) snd) rest
-      zDict = case dict of
+      zDict = case dictParam of
         D1 k v -> foldl f (foldl f zBag k) v
         D2 fst snd rest ->
           let
@@ -635,7 +617,7 @@ instance traversableLem :: Traversable Lem where
             D2 <$> traverseTuple fst' <*> traverseTuple snd' <*> Data.Traversable.traverse traverseTuple rest'
     in
       Sekdict <$> nsek <*> ndict
-  traverse f (Bagdict bag dict) =
+  traverse f (Bagdict bag dictParam) =
     let
       nbag = case bag of
         B1 lem -> B1 <$> traverse f lem
@@ -644,7 +626,7 @@ instance traversableLem :: Traversable Lem where
             travRest = Data.Traversable.traverse (traverse f) rest'
           in
             B2 <$> traverse f fst' <*> traverse f snd' <*> travRest
-      ndict = case dict of
+      ndict = case dictParam of
         D1 k v -> D1 <$> traverse f k <*> traverse f v
         D2 fst' snd' rest' ->
           let
@@ -682,7 +664,7 @@ instance traversableLem :: Traversable Lem where
             D2 <$> sequenceTuple fst' <*> sequenceTuple snd' <*> Data.Traversable.traverse sequenceTuple rest'
     in
       Sekdict <$> nsek <*> ndict
-  sequence (Bagdict bag dict) =
+  sequence (Bagdict bag dictParam) =
     let
       nbag = case bag of
         B1 lem -> B1 <$> sequence lem
@@ -691,7 +673,7 @@ instance traversableLem :: Traversable Lem where
             seqRest = Data.Traversable.traverse sequence rest'
           in
             B2 <$> sequence fst' <*> sequence snd' <*> seqRest
-      ndict = case dict of
+      ndict = case dictParam of
         D1 k v -> D1 <$> sequence k <*> sequence v
         D2 fst' snd' rest' ->
           let

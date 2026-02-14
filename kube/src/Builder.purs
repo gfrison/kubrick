@@ -221,7 +221,7 @@ doLine line kid =
 
 -- | Process a single line element (State monad)
 doLineElement :: Lem Raw -> Int -> Kid -> State (Tuple Kid Kube) Unit
-doLineElement Gap position kid = pure unit  -- Gap is ignored
+doLineElement Gap _position _kid = pure unit  -- Gap is ignored
 doLineElement (Sek fst snd rest) position kid = do
   nid <- nextKid
   doSek (Sek fst snd rest) nid
