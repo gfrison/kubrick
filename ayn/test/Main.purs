@@ -1,8 +1,8 @@
-module Test.Ayn.Main where
+module Test.FactParser.Main where
 
 import Prelude
 
-import Ayn (parse)
+import FactParser (parse)
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Effect (Effect)
@@ -15,7 +15,7 @@ import Test.Spec.Runner.Node (runSpecAndExitProcess)
 
 main :: Effect Unit
 main = runSpecAndExitProcess [consoleReporter] do
-  describe "Ayn" do
+  describe "FactParser" do
     describe "parse" do
       describe "basic L1" do
         it "parses single word" do

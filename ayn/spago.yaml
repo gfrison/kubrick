@@ -15,7 +15,7 @@ package:
     - transformers
     - tuples
   test:
-    main: Test.Ayn.Main
+    main: Test.FactParser.Main
     dependencies:
       - aff
       - spec
