@@ -7,8 +7,10 @@ package:
     - either
     - foldable-traversable
     - kubrick-eden
+    - kubrick-kube
     - lists
     - maybe
+    - ordered-collections
     - prelude
     - spec-node
     - strings

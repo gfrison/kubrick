@@ -1,5 +1,9 @@
 module FactParser 
   ( parse
+  , parseMultiline
+  , tokenize
+  , parseLemWith
+  , parseRaw
   ) where
 
 import Prelude
@@ -67,10 +71,125 @@ parseFacts lines = traverse parseLem lines
 
 -- | Parse a single Lem
 parseLem :: String -> Either String (Lem Raw)
-parseLem input = parseLemFromTokens (tokenize input)
+parseLem input = parseLemWith parseRaw (tokenize input)
 
--- | Tokenize input string
--- | Complexity: O(n) where n is the length of the input string
+-- | Parse a Lem from tokens using a custom atom parser
+parseLemWith :: forall t. (String -> Either String (Lem t)) -> List String -> Either String (Lem t)
+parseLemWith atomParser tokens = do
+  result <- parseExpression tokens
+  pure result.lem
+  where
+  parseExpression :: List String -> Either String { lem :: Lem t, rest :: List String }
+  parseExpression toks = parseSequence toks Nil
+  
+  constructFromAcc :: List (Lem t) -> (Lem t -> Lem t -> List (Lem t) -> Lem t) -> Either String (Lem t)
+  constructFromAcc acc constructor =
+    case List.reverse acc of
+      Nil -> Right L0
+      h : Nil -> Right h
+      h : h2 : rest -> Right $ constructor h h2 rest
+  
+  parseSequence :: List String -> List (Lem t) -> Either String { lem :: Lem t, rest :: List String }
+  parseSequence Nil acc = do
+    value <- constructFromAcc acc Sek
+    pure { lem: value, rest: Nil }
+  parseSequence ts@(tok : rest) acc
+    | tok == "," = do
+        value <- constructFromAcc acc Sek
+        pure { lem: value, rest: ts }
+    | tok == "->" =
+        case List.reverse acc of
+          Nil -> Left "Empty before ->"
+          key : Nil -> do
+            valueResult <- parseSequence rest Nil
+            pure { lem: Pair key valueResult.lem, rest: valueResult.rest }
+          _ -> Left "Multiple elements before ->"
+    | tok == ";" = do
+        case acc of
+          Nil -> Left "Empty before ;"
+          prev : accRest -> do
+            choiceResult <- parseChoiceAtTopLevel rest (prev : Nil)
+            parseSequence choiceResult.rest (choiceResult.lem : accRest)
+    | otherwise = do
+        primResult <- parsePrimary ts
+        parseSequence primResult.rest (primResult.lem : acc)
+  
+  parseChoiceAtTopLevel :: List String -> List (Lem t) -> Either String { lem :: Lem t, rest :: List String }
+  parseChoiceAtTopLevel Nil _ = Left "Incomplete choice"
+  parseChoiceAtTopLevel ts acc = do
+    primResult <- parsePrimary ts
+    case primResult.rest of
+      (";") : restTokens -> parseChoiceAtTopLevel restTokens (primResult.lem : acc)
+      _ -> do
+        value <- constructFromAcc (primResult.lem : acc) Choice
+        case value of
+          Choice _ _ _ -> pure { lem: value, rest: primResult.rest }
+          _ -> Left "Choice needs at least 2 elements"
+  
+  parsePrimary :: List String -> Either String { lem :: Lem t, rest :: List String }
+  parsePrimary Nil = Left "Unexpected end"
+  parsePrimary (tok : rest)
+    | tok == "{" = parseDelimited "}" Bag rest
+    | tok == "[" = parseDelimited "]" Sek rest
+    | tok == "(" = parseDelimitedWithChoice ")" rest
+    | tok == ";" = Left "Unexpected ;"
+    | tok == ")" = Left "Unexpected )"
+    | tok == "]" = Left "Unexpected ]"
+    | tok == "}" = Left "Unexpected }"
+    | otherwise = do
+        lem <- atomParser tok
+        pure { lem, rest }
+  
+  parseDelimited :: String -> (Lem t -> Lem t -> List (Lem t) -> Lem t) -> List String -> Either String { lem :: Lem t, rest :: List String }
+  parseDelimited closingToken constructor = parseDelimitedContents Nil
+    where
+    parseDelimitedContents :: List (Lem t) -> List String -> Either String { lem :: Lem t, rest :: List String }
+    parseDelimitedContents _ Nil = Left $ "Unclosed " <> closingToken
+    parseDelimitedContents acc (tok : tokRest)
+      | tok == closingToken = do
+          lem <- constructFromAcc acc constructor
+          pure { lem, rest: tokRest }
+      | otherwise = do
+          primResult <- parsePrimary (tok : tokRest)
+          parseDelimitedContents (primResult.lem : acc) primResult.rest
+  
+  parseDelimitedWithChoice :: String -> List String -> Either String { lem :: Lem t, rest :: List String }
+  parseDelimitedWithChoice closingToken = parseContents Nil
+    where
+    parseContents :: List (Lem t) -> List String -> Either String { lem :: Lem t, rest :: List String }
+    parseContents _ Nil = Left "Unclosed ("
+    parseContents acc ts@(tok : tokRest)
+      | tok == closingToken = do
+          value <- constructFromAcc acc Sek
+          pure { lem: value, rest: tokRest }
+      | tok == ";" = 
+          case List.reverse acc of
+            Nil -> Left "Empty before ;"
+            current : Nil -> parseChoiceInParens tokRest (current : Nil)
+            _ -> Left "Multiple elements before ; in choice"
+      | otherwise = do
+          primResult <- parsePrimary ts
+          parseContents (primResult.lem : acc) primResult.rest
+    
+    parseChoiceInParens :: List String -> List (Lem t) -> Either String { lem :: Lem t, rest :: List String }
+    parseChoiceInParens Nil _ = Left "Unclosed choice"
+    parseChoiceInParens (tok : tokRest) acc
+      | tok == closingToken = do
+          lem <- constructFromAcc acc Choice
+          case lem of
+            Choice _ _ _ -> pure { lem, rest: tokRest }
+            _ -> Left "Choice needs at least 2 elements"
+      | tok == ";" = Left "Empty element in choice"
+      | otherwise = do
+          primResult <- parsePrimary (tok : tokRest)
+          case primResult.rest of
+            (";") : restTokens -> parseChoiceInParens restTokens (primResult.lem : acc)
+            (")") : restTokens -> do
+              lem <- constructFromAcc (primResult.lem : acc) Choice
+              case lem of
+                Choice _ _ _ -> pure { lem, rest: restTokens }
+                _ -> Left "Choice needs at least 2 elements"
+            _ -> Left "Expected ; or ) in choice"
 tokenize :: String -> List String
 tokenize input = 
   let
@@ -127,150 +246,20 @@ tokenize input =
               tokenizeImpl str next (current <> SCU.singleton c) acc inQuotes depth
             Nothing -> acc
 
--- | Parse Lem from tokens
--- | Complexity: O(n) where n is the number of tokens
-parseLemFromTokens :: List String -> Either String (Lem Raw)
-parseLemFromTokens tokens = do
-  result <- parseExpression tokens
-  pure result.lem
-  where
-  parseExpression :: List String -> Either String { lem :: Lem Raw, rest :: List String }
-  parseExpression toks = parseSekOrPair toks
-  
-  parseSekOrPair :: List String -> Either String { lem :: Lem Raw, rest :: List String }
-  parseSekOrPair toks = parseSequence toks Nil
-  
-  -- Helper: Construct Lem from reversed accumulator
-  constructFromAcc :: List (Lem Raw) -> (Lem Raw -> Lem Raw -> List (Lem Raw) -> Lem Raw) -> Either String (Lem Raw)
-  constructFromAcc acc constructor =
-    case List.reverse acc of
-      Nil -> Right L0
-      h : Nil -> Right h
-      h : h2 : rest -> Right $ constructor h h2 rest
-  
-  parseSequence :: List String -> List (Lem Raw) -> Either String { lem :: Lem Raw, rest :: List String }
-  parseSequence Nil acc = do
-    value <- constructFromAcc acc Sek
-    pure { lem: value, rest: Nil }
-  parseSequence tokens@(tok : rest) acc
-    | tok == "," = do
-        value <- constructFromAcc acc Sek
-        pure { lem: value, rest: tokens }
-    | tok == "->" =
-        case List.reverse acc of
-          Nil -> Left "Empty before ->"
-          key : Nil -> do
-            valueResult <- parseSequence rest Nil
-            pure { lem: Pair key valueResult.lem, rest: valueResult.rest }
-          _ -> Left "Multiple elements before ->"
-    | tok == ";" = do
-        case acc of
-          Nil -> Left "Empty before ;"
-          prev : accRest -> do
-            choiceResult <- parseChoiceAtTopLevel rest (prev : Nil)
-            parseSequence choiceResult.rest (choiceResult.lem : accRest)
-    | otherwise = do
-        primResult <- parsePrimary tokens
-        parseSequence primResult.rest (primResult.lem : acc)
-  
-  parseChoiceAtTopLevel :: List String -> List (Lem Raw) -> Either String { lem :: Lem Raw, rest :: List String }
-  parseChoiceAtTopLevel Nil _ = Left "Incomplete choice"
-  parseChoiceAtTopLevel tokens acc = do
-    primResult <- parsePrimary tokens
-    case primResult.rest of
-      (";") : restTokens -> parseChoiceAtTopLevel restTokens (primResult.lem : acc)
-      _ -> do
-        value <- constructFromAcc (primResult.lem : acc) Choice
-        case value of
-          Choice _ _ _ -> pure { lem: value, rest: primResult.rest }
-          _ -> Left "Choice needs at least 2 elements"
-  
-  parsePrimary :: List String -> Either String { lem :: Lem Raw, rest :: List String }
-  parsePrimary Nil = Left "Unexpected end"
-  parsePrimary (tok : rest)
-    | tok == "{" = parseDelimited "}" Bag rest
-    | tok == "[" = parseDelimited "]" Sek rest
-    | tok == "(" = parseDelimitedWithChoice ")" rest
-    | tok == ";" = Left "Unexpected ;"
-    | tok == ")" = Left "Unexpected )"
-    | tok == "]" = Left "Unexpected ]"
-    | tok == "}" = Left "Unexpected }"
-    | otherwise = do
-        raw <- parseRaw tok
-        pure { lem: L1 raw, rest: rest }
-  
-  -- Generic delimited parser for {}, []
-  -- Complexity: O(n) where n is the number of tokens inside the delimiter
-  parseDelimited :: String -> (Lem Raw -> Lem Raw -> List (Lem Raw) -> Lem Raw) -> List String -> Either String { lem :: Lem Raw, rest :: List String }
-  parseDelimited closingToken constructor = parseDelimitedContents Nil
-    where
-    parseDelimitedContents :: List (Lem Raw) -> List String -> Either String { lem :: Lem Raw, rest :: List String }
-    parseDelimitedContents _ Nil = Left $ "Unclosed " <> closingToken
-    parseDelimitedContents acc (tok : tokRest)
-      | tok == closingToken = do
-          lem <- constructFromAcc acc constructor
-          pure { lem, rest: tokRest }
-      | otherwise = do
-          primResult <- parsePrimary (tok : tokRest)
-          parseDelimitedContents (primResult.lem : acc) primResult.rest
-  
-  -- Special parser for () which handles both Sek and Choice
-  parseDelimitedWithChoice :: String -> List String -> Either String { lem :: Lem Raw, rest :: List String }
-  parseDelimitedWithChoice closingToken = parseContents Nil
-    where
-    parseContents :: List (Lem Raw) -> List String -> Either String { lem :: Lem Raw, rest :: List String }
-    parseContents _ Nil = Left "Unclosed ("
-    parseContents acc tokens@(tok : tokRest)
-      | tok == closingToken = do
-          value <- constructFromAcc acc Sek
-          pure { lem: value, rest: tokRest }
-      | tok == ";" = 
-          case List.reverse acc of
-            Nil -> Left "Empty before ;"
-            current : Nil -> parseChoiceInParens tokRest (current : Nil)
-            _ -> Left "Multiple elements before ; in choice"
-      | otherwise = do
-          primResult <- parsePrimary tokens
-          parseContents (primResult.lem : acc) primResult.rest
-    
-    parseChoiceInParens :: List String -> List (Lem Raw) -> Either String { lem :: Lem Raw, rest :: List String }
-    parseChoiceInParens Nil _ = Left "Unclosed choice"
-    parseChoiceInParens (tok : tokRest) acc
-      | tok == closingToken = do
-          lem <- constructFromAcc acc Choice
-          case lem of
-            Choice _ _ _ -> pure { lem, rest: tokRest }
-            _ -> Left "Choice needs at least 2 elements"
-      | tok == ";" = Left "Empty element in choice"
-      | otherwise = do
-          primResult <- parsePrimary (tok : tokRest)
-          case primResult.rest of
-            (";") : restTokens -> parseChoiceInParens restTokens (primResult.lem : acc)
-            (")") : restTokens -> do
-              lem <- constructFromAcc (primResult.lem : acc) Choice
-              case lem of
-                Choice _ _ _ -> pure { lem, rest: restTokens }
-                _ -> Left "Choice needs at least 2 elements"
-            _ -> Left "Expected ; or ) in choice"
-  
-  -- Parse raw values (optimized for common cases)
-  -- Complexity: O(1) for booleans, O(n) for string parsing where n is string length
-  parseRaw :: String -> Either String Raw
-  parseRaw str
-    -- Fast path for booleans
-    | str == "true" = Right $ Rb true
-    | str == "false" = Right $ Rb false
-    -- Check for quoted string (optimized check)
-    | String.length str >= 2 && String.take 1 str == "\"" && String.drop (String.length str - 1) str == "\"" =
-        Right $ Rs (String.take (String.length str - 2) (String.drop 1 str))
-    -- Try parsing as number
-    | otherwise =
-        case Number.fromString str of
-          Just n ->
-            if String.contains (Pattern ".") str then
-              Right $ Rf n
-            else
-              case Int.fromString str of
-                Just i -> Right $ Ri i
-                Nothing -> Right $ Rs str
-          Nothing -> Right $ Rs str
+-- | Parse raw values
+parseRaw :: String -> Either String (Lem Raw)
+parseRaw str
+  | str == "true" = Right $ L1 $ Rb true
+  | str == "false" = Right $ L1 $ Rb false
+  | String.length str >= 2 && String.take 1 str == "\"" && String.drop (String.length str - 1) str == "\"" =
+      Right $ L1 $ Rs (String.take (String.length str - 2) (String.drop 1 str))
+  | otherwise =
+      case Number.fromString str of
+        Just n ->
+          if String.contains (Pattern ".") str then
+            Right $ L1 $ Rf n
+          else
+            case Int.fromString str of
+              Just i -> Right $ L1 $ Ri i
+              Nothing -> Right $ L1 $ Rs str
+        Nothing -> Right $ L1 $ Rs str
