@@ -9,6 +9,7 @@ package:
     - maybe
     - ordered-collections
     - prelude
+    - strings
     - transformers
     - tuples
     - unordered-collections

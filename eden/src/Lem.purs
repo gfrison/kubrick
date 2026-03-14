@@ -36,6 +36,7 @@ import Prelude
 import Data.Foldable (class Foldable, foldl, foldr)
 import Data.List (List(..), (:))
 import Data.List as List
+import Data.String as String
 import Data.Traversable (class Traversable, traverse, sequence)
 import Data.Traversable as Data.Traversable
 import Data.Tuple (Tuple(..))
@@ -429,29 +430,41 @@ instance eqLem :: Eq t => Eq (Lem t) where
 
 -- *** Show Instances
 
+showSpaced :: forall a. Show a => List (Lem a) -> String
+showSpaced elems = String.joinWith " " $ map show $ List.toUnfoldable elems
+
+showSemicolon :: forall a. Show a => List (Lem a) -> String
+showSemicolon elems = String.joinWith ";" $ map show $ List.toUnfoldable elems
+
+showTuplePair :: forall a. Show a => Tuple (Lem a) (Lem a) -> String
+showTuplePair (Tuple k v) = show k <> " -> " <> show v
+
+showTupleList :: forall a. Show a => List (Tuple (Lem a) (Lem a)) -> String
+showTupleList elems = String.joinWith " " $ map showTuplePair $ List.toUnfoldable elems
+
 instance showSek1 :: Show a => Show (Sek1 a) where
-  show (S2 fst snd rest) = "(S2 " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
-  show (S1 l) = "(S1 " <> show l <> ")"
+  show (S2 fst snd rest) = "[" <> showSpaced (fst : snd : rest) <> "]"
+  show (S1 l) = show l
 
 instance showBag1 :: Show a => Show (Bag1 a) where
-  show (B2 fst snd rest) = "(B2 " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
-  show (B1 l) = "(B1 " <> show l <> ")"
+  show (B2 fst snd rest) = "{" <> showSpaced (fst : snd : rest) <> "}"
+  show (B1 l) = show l
 
 instance showDict1 :: Show a => Show (Dict1 a) where
-  show (D2 fst snd rest) = "(D2 " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
-  show (D1 k v) = "(D1 " <> show k <> " " <> show v <> ")"
+  show (D2 fst snd rest) = showTupleList (fst : snd : rest)
+  show (D1 k v) = show k <> " -> " <> show v
 
 instance showLem :: Show a => Show (Lem a) where
-  show L0 = "L0"
+  show L0 = ""
   show Gap = "_"
-  show (L1 x) = "(L1 " <> show x <> ")"
-  show (Pair k v) = "(Pair " <> show k <> " " <> show v <> ")"
-  show (Sek fst snd rest) = "(Sek " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
-  show (Bag fst snd rest) = "(Bag " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
-  show (Choice fst snd rest) = "(Choice " <> show fst <> " " <> show snd <> " " <> show rest <> ")"
-  show (Dict fst snd m) = "(Dict " <> show fst <> " " <> show snd <> " " <> show m <> ")"
-  show (Sekdict s d) = "(Sekdict " <> show s <> " " <> show d <> ")"
-  show (Bagdict b d) = "(Bagdict " <> show b <> " " <> show d <> ")"
+  show (L1 x) = show x
+  show (Pair k v) = show k <> " -> " <> show v
+  show (Sek fst snd rest) = "[" <> showSpaced (fst : snd : rest) <> "]"
+  show (Bag fst snd rest) = "{" <> showSpaced (fst : snd : rest) <> "}"
+  show (Choice fst snd rest) = "(" <> showSemicolon (fst : snd : rest) <> ")"
+  show (Dict fst snd rest) = showTupleList (fst : snd : rest)
+  show (Sekdict s d) = show s <> " " <> show d
+  show (Bagdict b d) = "{" <> show b <> " " <> show d <> "}"
 
 -- *** Functor, Foldable, and Traversable Instances
 
@@ -603,12 +616,12 @@ instance traversableLem :: Traversable Lem where
       traverseTuple (Tuple k v) = Tuple <$> traverse f k <*> traverse f v
     in
       Dict <$> traverseTuple fst <*> traverseTuple snd <*> Data.Traversable.traverse traverseTuple rest
-  traverse f (Sekdict sek dict) =
+  traverse f (Sekdict sek dictPart) =
     let
       nsek = case sek of
         S1 lem -> S1 <$> traverse f lem
         S2 fst' snd' rest' -> S2 <$> traverse f fst' <*> traverse f snd' <*> Data.Traversable.traverse (traverse f) rest'
-      ndict = case dict of
+      ndict = case dictPart of
         D1 k v -> D1 <$> traverse f k <*> traverse f v
         D2 fst' snd' rest' ->
           let
@@ -650,12 +663,12 @@ instance traversableLem :: Traversable Lem where
       sequenceTuple (Tuple k v) = Tuple <$> sequence k <*> sequence v
     in
       Dict <$> sequenceTuple fst <*> sequenceTuple snd <*> Data.Traversable.traverse sequenceTuple rest
-  sequence (Sekdict sek dict) =
+  sequence (Sekdict sek dictPart) =
     let
       nsek = case sek of
         S1 lem -> S1 <$> sequence lem
         S2 fst' snd' rest' -> S2 <$> sequence fst' <*> sequence snd' <*> Data.Traversable.traverse sequence rest'
-      ndict = case dict of
+      ndict = case dictPart of
         D1 k v -> D1 <$> sequence k <*> sequence v
         D2 fst' snd' rest' ->
           let

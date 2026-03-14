@@ -4,77 +4,76 @@ import Prelude
 
 import Data.List as List
 import Data.List.Types (List(..))
-import Data.String as String
 import Data.Tuple.Nested ((/\))
 import Kubrick.Lem (Lem(..), (<+), (<+>), (+:))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual, shouldSatisfy)
+import Data.String as String
 
 spec :: Spec Unit
 spec = do
   describe "Lem.Show" do
     describe "showLem" do
       it "shows L0" do
-        show (L0 :: Lem Int) `shouldEqual` "L0"
+        show (L0 :: Lem Int) `shouldEqual` ""
 
       it "shows L1" do
-        show (L1 42) `shouldEqual` "(L1 42)"
+        show (L1 42) `shouldEqual` "42"
 
       it "shows Pair" do
-        show (Pair (L1 1) (L1 2)) `shouldEqual` "(Pair (L1 1) (L1 2))"
+        show (Pair (L1 1) (L1 2)) `shouldEqual` "1 -> 2"
 
       it "shows Sek with empty rest" do
-        show (Sek (L1 1) (L1 2) Nil) `shouldEqual` "(Sek (L1 1) (L1 2) Nil)"
+        show (Sek (L1 1) (L1 2) Nil) `shouldEqual` "[1 2]"
 
       it "shows Sek with rest" do
-        show (Sek (L1 1) (L1 2) (List.singleton (L1 3))) `shouldEqual` "(Sek (L1 1) (L1 2) ((L1 3) : Nil))"
+        show (Sek (L1 1) (L1 2) (List.singleton (L1 3))) `shouldEqual` "[1 2 3]"
 
       it "shows Bag with empty rest" do
-        show (Bag (L1 1) (L1 2) Nil) `shouldEqual` "(Bag (L1 1) (L1 2) Nil)"
+        show (Bag (L1 1) (L1 2) Nil) `shouldEqual` "{1 2}"
 
       it "shows Bag with rest" do
-        show (Bag (L1 1) (L1 2) (List.singleton (L1 3))) `shouldEqual` "(Bag (L1 1) (L1 2) ((L1 3) : Nil))"
+        show (Bag (L1 1) (L1 2) (List.singleton (L1 3))) `shouldEqual` "{1 2 3}"
 
       it "shows Choice with empty rest" do
-        show (Choice (L1 1) (L1 2) Nil) `shouldEqual` "(Choice (L1 1) (L1 2) Nil)"
+        show (Choice (L1 1) (L1 2) Nil) `shouldEqual` "(1;2)"
 
       it "shows Choice with rest" do
-        show (Choice (L1 1) (L1 2) (List.singleton (L1 3))) `shouldEqual` "(Choice (L1 1) (L1 2) ((L1 3) : Nil))"
+        show (Choice (L1 1) (L1 2) (List.singleton (L1 3))) `shouldEqual` "(1;2;3)"
 
       it "shows Dict with empty rest" do
-        show (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil) `shouldEqual` "(Dict (Tuple (L1 1) (L1 10)) (Tuple (L1 2) (L1 20)) Nil)"
+        show (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil) `shouldEqual` "1 -> 10 2 -> 20"
 
       it "shows Dict with rest" do
-        show (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) (List.singleton (L1 3 /\ L1 30))) `shouldEqual` "(Dict (Tuple (L1 1) (L1 10)) (Tuple (L1 2) (L1 20)) ((Tuple (L1 3) (L1 30)) : Nil))"
+        show (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) (List.singleton (L1 3 /\ L1 30))) `shouldEqual` "1 -> 10 2 -> 20 3 -> 30"
 
       it "shows nested Pair" do
-        show (Pair (Pair (L1 1) (L1 2)) (L1 3)) `shouldEqual` "(Pair (Pair (L1 1) (L1 2)) (L1 3))"
+        show (Pair (Pair (L1 1) (L1 2)) (L1 3)) `shouldEqual` "1 -> 2 -> 3"
 
     describe "show Lem types created with public API" do
       it "shows L0" do
-        show (L0 :: Lem Int) `shouldEqual` "L0"
+        show (L0 :: Lem Int) `shouldEqual` ""
 
       it "shows L1" do
-        show (L1 42 :: Lem Int) `shouldEqual` "(L1 42)"
+        show (L1 42 :: Lem Int) `shouldEqual` "42"
 
       it "shows Bag created with <+ operator" do
         let bag = 2 <+ ((L1 1) :: Lem Int) :: Lem Int
-        -- Bag internally contains B2, verify output contains "Bag"
-        show bag `shouldSatisfy` (String.contains (String.Pattern "Bag"))
+        show bag `shouldSatisfy` (String.contains (String.Pattern "{"))
 
       it "shows Bag created with <+> operator" do
         let bag = (L1 1 :: Lem Int) <+> (L1 2)
-        show bag `shouldSatisfy` (String.contains (String.Pattern "Bag"))
+        show bag `shouldSatisfy` (String.contains (String.Pattern "{"))
 
       it "shows Dict created with smart constructor" do
-        let dict = (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil) :: Lem Int
-        show dict `shouldSatisfy` (String.contains (String.Pattern "Dict"))
+        let d = (Dict (L1 1 /\ L1 10) (L1 2 /\ L1 20) Nil) :: Lem Int
+        show d `shouldSatisfy` (String.contains (String.Pattern "->"))
 
     describe "showLem with composite types" do
       it "shows Sekdict" do
         let sekdict = (1 /\ 2) +: L1 3
-        show sekdict `shouldSatisfy` (String.contains (String.Pattern "Sekdict"))
+        show sekdict `shouldSatisfy` (String.contains (String.Pattern "->"))
 
       it "shows Bagdict" do
         let bagdict = Pair (L1 2) (L1 3) <+> L1 1
-        show bagdict `shouldSatisfy` (String.contains (String.Pattern "Bagdict"))
+        show bagdict `shouldSatisfy` (String.contains (String.Pattern "{"))
