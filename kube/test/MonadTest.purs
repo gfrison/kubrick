@@ -10,9 +10,9 @@ import Kubrick.Lem (Lem(..), (+:), (<+>))
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
-type Builder = Kube
+type Builder = Kube Raw
 
-emptyBuilder :: Kube
+emptyBuilder :: Kube Raw
 emptyBuilder = emptyKube
 
 spec :: Spec Unit

@@ -19,11 +19,11 @@ import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
 -- Helper to add a Lem and return its Kid
-addLem :: Lem Raw -> Tuple Kid (Tuple Kid Kube)
+addLem :: Lem Raw -> Tuple Kid (Tuple Kid (Kube Raw))
 addLem l = runState (addM l) (Tuple (Kid 0) emptyKube)
 
 -- Helper to build Kube with multiple Lems and get their Kids
-addMultiple :: Array (Lem Raw) -> { kids :: Array Kid, kube :: Tuple Kid Kube }
+addMultiple :: Array (Lem Raw) -> { kids :: Array Kid, kube :: Tuple Kid (Kube Raw) }
 addMultiple lems = 
   let 
     Tuple kids finalState = runState 

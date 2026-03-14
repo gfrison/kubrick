@@ -14,11 +14,10 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Kubrick.Kube.Types (Kid(..), Bi, Kube, bi0, put)
 import Kubrick.Lem (Lem(..), Sek1(..), Bag1(..), Dict1(..))
-import Kubrick.Types (Raw)
 
 -- | Add a document to the builder using State monad
 -- | Returns the Kid that represents this Lem structure  
-add :: Lem Raw -> State (Tuple Kid Kube) Kid
+add :: forall a. Ord a => Lem a -> State (Tuple Kid (Kube a)) Kid
 add doc = case doc of
   -- Dict needs special handling: pairs get Kids first, then Dict gets its Kid
   Dict fst snd rest -> do
@@ -48,7 +47,7 @@ derive instance eqSide :: Eq Side
 derive instance ordSide :: Ord Side
 -- | Process a Sek and return its Kid (allocated after nested elements)
 -- | This ensures nested Seks get lower Kids than their parent
-doSekAndReturnKid :: List (Lem Raw) -> State (Tuple Kid Kube) Kid
+doSekAndReturnKid :: forall a. Ord a => List (Lem a) -> State (Tuple Kid (Kube a)) Kid
 doSekAndReturnKid elements = do
   -- Allocate Kids for nested elements first by processing the line with a temporary parent
   -- We'll collect info about what needs to be linked
@@ -76,7 +75,7 @@ doSekAndReturnKid elements = do
   pure sekKid
 
 -- | Process a map and return its Kid (allocated after pairs)
-doMapAndReturnKid :: List (Tuple (Lem Raw) (Lem Raw)) -> State (Tuple Kid Kube) Kid
+doMapAndReturnKid :: forall a. Ord a => List (Tuple (Lem a) (Lem a)) -> State (Tuple Kid (Kube a)) Kid
 doMapAndReturnKid entries = do
   -- First, allocate Kids for all pairs
   pairKids <- traverse (\(Tuple key value) -> do
@@ -92,7 +91,7 @@ doMapAndReturnKid entries = do
   pure dictKid
 
 -- | Add positioned data value
-addPos :: Int -> Raw -> Kid -> Kube -> Kube
+addPos :: forall a. Ord a => Int -> a -> Kid -> Kube a -> Kube a
 addPos position value kid kube =
   let
     padded = padSeqs bi0 (position + 1) kube.seqs
@@ -104,7 +103,7 @@ addPos position value kid kube =
       Nothing -> kube
 
 -- | Add positioned Kid reference
-addPosRef :: Int -> Kid -> Kid -> Kube -> Kube
+addPosRef :: forall a. Ord a => Int -> Kid -> Kid -> Kube a -> Kube a
 addPosRef position kidValue targetKid kube =
   let
     padded = padSeqs bi0 (position + 1) kube.refSeqs
@@ -116,25 +115,25 @@ addPosRef position kidValue targetKid kube =
       Nothing -> kube
 
 -- | Add to roots set
-addRoot :: Kid -> Kube -> Kube
+addRoot :: forall a. Kid -> Kube a -> Kube a
 addRoot value builder =
   builder { roots = Set.insert value builder.roots }
 
 -- | Add to sets set
-addToSets :: Kid -> Kube -> Kube
+addToSets :: forall a. Kid -> Kube a -> Kube a
 addToSets value builder =
   builder { sets = Set.insert value builder.sets }
 
 -- | Get next Kid and increment counter
-nextKid :: State (Tuple Kid Kube) Kid
+nextKid :: forall a. State (Tuple Kid (Kube a)) Kid
 nextKid = state \(Tuple (Kid n) builder) -> Tuple (Kid n) (Tuple (Kid (n + 1)) builder)
 
 -- | Modify builder
-modifyBuilder :: (Kube -> Kube) -> State (Tuple Kid Kube) Unit
+modifyBuilder :: forall a. (Kube a -> Kube a) -> State (Tuple Kid (Kube a)) Unit
 modifyBuilder f = state \(Tuple kid builder) -> Tuple unit (Tuple kid (f builder))
 
 -- | Process a document based on its type (State monad version)
-doDoc :: Lem Raw -> Kid -> State (Tuple Kid Kube) Unit
+doDoc :: forall a. Ord a => Lem a -> Kid -> State (Tuple Kid (Kube a)) Unit
 doDoc L0 _ = pure unit
 doDoc Gap _ = pure unit  -- Gap is ignored
 doDoc (L1 value) kid = modifyBuilder (addPos 0 value kid)
@@ -153,13 +152,13 @@ doDoc (Bagdict bag dict) kid = do
   doDictFromDict1 dict kid
 
 -- | Process a Pair - both key and val map to the SAME Kid
-doPair :: Lem Raw -> Lem Raw -> Kid -> State (Tuple Kid Kube) Unit
+doPair :: forall a. Ord a => Lem a -> Lem a -> Kid -> State (Tuple Kid (Kube a)) Unit
 doPair k v kid = do
   doPairElement k kid Key
   doPairElement v kid Val
 
 -- | Process a Pair element (key or value)
-doPairElement :: Lem Raw -> Kid -> Side -> State (Tuple Kid Kube) Unit
+doPairElement :: forall a. Ord a => Lem a -> Kid -> Side -> State (Tuple Kid (Kube a)) Unit
 doPairElement L0 _ _ = pure unit
 doPairElement Gap _ _ = pure unit  -- Gap is ignored
 doPairElement (L1 value) kid side =
@@ -172,19 +171,19 @@ doPairElement doc kid side = do
   modifyBuilder (addIndexRef nid kid side)
 
 -- | Process Sek1 types (State monad)
-doSekFromSek1 :: Sek1 Raw -> Kid -> State (Tuple Kid Kube) Unit
+doSekFromSek1 :: forall a. Ord a => Sek1 a -> Kid -> State (Tuple Kid (Kube a)) Unit
 doSekFromSek1 (S1 lem) kid = doDoc lem kid
 doSekFromSek1 (S2 fst snd rest) kid = doSek (Sek fst snd rest) kid
 
 -- | Process Bag1 types (State monad)
-doBagFromBag1 :: Bag1 Raw -> Kid -> State (Tuple Kid Kube) Unit
+doBagFromBag1 :: forall a. Ord a => Bag1 a -> Kid -> State (Tuple Kid (Kube a)) Unit
 doBagFromBag1 (B1 lem) kid = doDoc lem kid
 doBagFromBag1 (B2 fst snd rest) kid = doChoice (fst : snd : rest) kid Key
 
 -- | Process Dict1 types (State monad)
 -- | For Sekdict/Bagdict, the parent Kid is already allocated
 -- | We need to create pair Kids and link them to the parent
-doDictFromDict1 :: Dict1 Raw -> Kid -> State (Tuple Kid Kube) Unit
+doDictFromDict1 :: forall a. Ord a => Dict1 a -> Kid -> State (Tuple Kid (Kube a)) Unit
 doDictFromDict1 (D1 k v) parentKid = do
   -- The Pair needs its own Kid, then link to parent via refKeys
   pairKid <- nextKid
@@ -202,7 +201,7 @@ doDictFromDict1 (D2 fst snd rest) parentKid = do
   modifyBuilder (addToSets parentKid)
 
 -- | Process a Sek structure (State monad)
-doSek :: Lem Raw -> Kid -> State (Tuple Kid Kube) Unit
+doSek :: forall a. Ord a => Lem a -> Kid -> State (Tuple Kid (Kube a)) Unit
 doSek (Sek fst snd rest) kid =
   let
     allElems = fst : snd : rest
@@ -211,16 +210,16 @@ doSek (Sek fst snd rest) kid =
 doSek lem kid = doDoc lem kid
 
 -- | Process a line (array sequence) (State monad)
-doLine :: List (Lem Raw) -> Kid -> State (Tuple Kid Kube) Unit
+doLine :: forall a. Ord a => List (Lem a) -> Kid -> State (Tuple Kid (Kube a)) Unit
 doLine line kid =
   let
-    indexed :: List (Tuple Int (Lem Raw))
+    indexed :: List (Tuple Int (Lem a))
     indexed = List.zip (List.range 0 (List.length line - 1)) line
   in
     void $ foldM (\_ (Tuple position doc) -> doLineElement doc position kid) unit indexed
 
 -- | Process a single line element (State monad)
-doLineElement :: Lem Raw -> Int -> Kid -> State (Tuple Kid Kube) Unit
+doLineElement :: forall a. Ord a => Lem a -> Int -> Kid -> State (Tuple Kid (Kube a)) Unit
 doLineElement Gap _position _kid = pure unit  -- Gap is ignored
 doLineElement (Sek fst snd rest) position kid = do
   nid <- nextKid
@@ -235,26 +234,26 @@ doLineElement doc position kid = do
 
 -- | Process a map (dictionary) (State monad)
 -- | Each pair gets its own Kid, then the Dict Kid references them via refKeys
-doMap :: List (Tuple (Lem Raw) (Lem Raw)) -> Kid -> State (Tuple Kid Kube) Unit
+doMap :: forall a. Ord a => List (Tuple (Lem a) (Lem a)) -> Kid -> State (Tuple Kid (Kube a)) Unit
 doMap entries parent = do
   void $ foldM (\_ entry -> doMapEntry parent entry) unit entries
   modifyBuilder (addToSets parent)
 
 -- | Process a single map entry (State monad)
 -- | Creates a new Kid for the pair and links it to parent via refKeys
-doMapEntry :: Kid -> Tuple (Lem Raw) (Lem Raw) -> State (Tuple Kid Kube) Unit
+doMapEntry :: forall a. Ord a => Kid -> Tuple (Lem a) (Lem a) -> State (Tuple Kid (Kube a)) Unit
 doMapEntry parent (Tuple key value) = do
   pairKid <- nextKid
   doPair key value pairKid
   modifyBuilder (addIndexRef pairKid parent Key)
 
 -- | Process a choice (alternatives) (State monad)
-doChoice :: List (Lem Raw) -> Kid -> Side -> State (Tuple Kid Kube) Unit
+doChoice :: forall a. Ord a => List (Lem a) -> Kid -> Side -> State (Tuple Kid (Kube a)) Unit
 doChoice alts parent side =
   void $ foldM (\_ doc -> doChoiceElement doc parent side) unit alts
 
 -- | Process a single choice element
-doChoiceElement :: Lem Raw -> Kid -> Side -> State (Tuple Kid Kube) Unit
+doChoiceElement :: forall a. Ord a => Lem a -> Kid -> Side -> State (Tuple Kid (Kube a)) Unit
 doChoiceElement L0 _ _ = pure unit
 doChoiceElement Gap _ _ = pure unit  -- Gap is ignored
 doChoiceElement (L1 value) parent side =
@@ -272,7 +271,7 @@ doChoiceElement doc parent side = do
 
 -- | Helper to add to appropriate index
 -- | Add data value to index
-addIndex :: Raw -> Kid -> Side -> Kube -> Kube
+addIndex :: forall a. Ord a => a -> Kid -> Side -> Kube a -> Kube a
 addIndex key value side builder = case side of
   Key -> builder { keys = put key value builder.keys }
   Val -> builder { vals = put key value builder.vals }
@@ -280,7 +279,7 @@ addIndex key value side builder = case side of
   Sets -> addToSets value builder
 
 -- | Add Kid reference to index
-addIndexRef :: Kid -> Kid -> Side -> Kube -> Kube
+addIndexRef :: forall a. Kid -> Kid -> Side -> Kube a -> Kube a
 addIndexRef key value side builder = case side of
   Key -> builder { refKeys = put key value builder.refKeys }
   Val -> builder { refVals = put key value builder.refVals }

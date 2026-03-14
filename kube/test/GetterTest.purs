@@ -23,7 +23,7 @@ spec = do
       let
         seq0 = put (Ri 1) (Kid 1) bi0  -- position 0: "a" -> Kid(1)
         seq1 = put (Ri 2) (Kid 1) bi0  -- position 1: "b" -> Kid(1)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: [seq0, seq1]
                , refSeqs: []
                , keys: bi0
@@ -47,7 +47,7 @@ spec = do
         seq0 = put (Ri 1) (Kid 1) $ put (Ri 2) (Kid 2) bi0  -- "a" -> Kid(1), "a2" -> Kid(2)
         refSeq1 = put (Kid 2) (Kid 1) bi0  -- Kid(2) -> Kid(1)
         seq1 = put (Ri 3) (Kid 2) bi0  -- "b2" -> Kid(2)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: [seq0, seq1]
                , refSeqs: [bi0, refSeq1]
                , keys: bi0
@@ -72,7 +72,7 @@ spec = do
       -- k.get(Kid(1)) should contain(L0 + "a" + "b")
       let
         keys = put (Ri 1) (Kid 1) $ put (Ri 2) (Kid 1) bi0  -- "a" -> Kid(1), "b" -> Kid(1)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: []
                , refSeqs: []
                , keys: keys
@@ -95,7 +95,7 @@ spec = do
       -- k.get(Kid(1)) should contain(L0 \/ "a" \/ "b")
       let
         keys = put (Ri 1) (Kid 1) $ put (Ri 2) (Kid 1) bi0  -- "a" -> Kid(1), "b" -> Kid(1)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: []
                , refSeqs: []
                , keys: keys
@@ -120,7 +120,7 @@ spec = do
       let
         keys = put (Ri 1) (Kid 2) bi0  -- "a" -> Kid(2)
         vals = put (Ri 2) (Kid 2) bi0  -- "b" -> Kid(2)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: []
                , refSeqs: []
                , keys: keys
@@ -147,7 +147,7 @@ spec = do
         seq1 = put (Ri 2) (Kid 1) bi0  -- "b" -> Kid(1)
         refKeys = put (Kid 1) (Kid 2) bi0  -- Kid(1) -> Kid(2)
         keys = put (Ri 3) (Kid 2) bi0  -- "c" -> Kid(2)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: [seq0, seq1]
                , refSeqs: []
                , keys: keys
@@ -174,7 +174,7 @@ spec = do
         seq0 = put (Ri 1) (Kid 1) bi0  -- "a" -> Kid(1)
         seq1 = put (Ri 2) (Kid 1) bi0  -- "b" -> Kid(1)
         keys = put (Ri 3) (Kid 1) bi0  -- "c" -> Kid(1)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: [seq0, seq1]
                , refSeqs: []
                , keys: keys
@@ -201,7 +201,7 @@ spec = do
         seq0 = put (Ri 1) (Kid 1) bi0  -- "a" -> Kid(1)
         seq1 = put (Ri 2) (Kid 1) bi0  -- "b" -> Kid(1)
         keys = put (Ri 3) (Kid 1) $ put (Ri 4) (Kid 1) bi0  -- "c" -> Kid(1), "d" -> Kid(1)
-        kube :: Kube
+        kube :: Kube Raw
         kube = { seqs: [seq0, seq1]
                , refSeqs: []
                , keys: keys

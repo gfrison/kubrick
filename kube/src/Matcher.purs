@@ -12,27 +12,8 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Kubrick.Kube.Types (Kid, Kube, getValues, getKeys)
 import Kubrick.Lem (Lem(..), Dict1(..))
-import Kubrick.Types (Raw)
 
-{-
-Match returns all Kids that satisfy the input Lem (partial, non-strict matching).
-
-Input → Matches:
-• Gap -> if it is a Sek it will match with anything existing at that position
-• Gap -> if it is in a Bag/Choice it will match with anything existing in keys more than 
- - what it is already matching. ex: if there are 2 strict elements and a Gap, 
- - it will match with anything that has at least those 2 elements plus one other element.
-• L1 a → L1(a) | Sek starting with a | Bag/Choice containing a
-• Sek [a,b,..] → Sek/Sekdict with prefix [a,b,..]
-• Bag {a,b,..} → Bag/Choice/[Bag|Choice]dict containing {a,b,..} as subset
-• Choice(x,y,..) → Kids matching ANY of x, y, .. (OR logic)
-• Pair(k,v) → Pair(k,v) | Dict/[Sek|Bag|Choice]dict containing (k,v)
-• Dict{(k1,v1),(k2,v2),..} → Dict/[Sek|Bag|Choice]dict containing all pairs
-
-Non-Dict elements use AND logic. Choice elements use OR logic.
--} 
-
-match :: Kube -> Lem Raw -> List Kid
+match :: forall a. Ord a => Kube a -> Lem a -> List Kid
 match kube query = case query of
   L0 -> mempty
   Gap -> matchGap kube  -- Gap matches everything with 1 element
@@ -54,27 +35,27 @@ toList :: forall a. Set a -> List a
 toList = fromFoldable
 
 -- Helper: Get values function from seqs array at given position
-getSeqBiAt :: Int -> Kube -> Maybe (Raw -> Set Kid)
+getSeqBiAt :: forall a. Ord a => Int -> Kube a -> Maybe (a -> Set Kid)
 getSeqBiAt pos kube = map getValues (Array.index kube.seqs pos)
 
 -- Helper: Find Kids where both key and value match (for Pairs)
-findPairKids :: Raw -> Raw -> Kube -> Set Kid
+findPairKids :: forall a. Ord a => a -> a -> Kube a -> Set Kid
 findPairKids k v kube = 
   Set.intersection (getValues kube.keys k) (getValues kube.vals v)
 
 -- Helper: Check if Kid is a Bag/Choice (in keys but not a Pair/Dict)
-isBagOrChoice :: Kid -> Kube -> Boolean
+isBagOrChoice :: forall a. Kid -> Kube a -> Boolean
 isBagOrChoice kid kube = Set.isEmpty (getKeys kube.vals kid)
 
 -- Helper: Get parent Kids that reference a given pairKid via refKeys
-getParentKids :: Kid -> Kube -> Set Kid
+getParentKids :: forall a. Kid -> Kube a -> Set Kid
 getParentKids pairKid kube = getValues kube.refKeys pairKid
 
 -- Match Gap: returns all roots
-matchGap :: Kube -> List Kid
+matchGap :: forall a. Kube a -> List Kid
 matchGap kube = toList kube.roots
 
-matchL1 :: Raw -> Kube -> List Kid
+matchL1 :: forall a. Ord a => a -> Kube a -> List Kid
 matchL1 a kube = toList matches
   where
     -- Match L1 at position 0 in Sek structures
@@ -92,7 +73,7 @@ matchL1 a kube = toList matches
     
     matches = Set.union seqMatches bagChoiceMatches
 
-matchSek :: Lem Raw -> Kube -> List Kid
+matchSek :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchSek sek kube = 
   if allL1OrGap sek
     then matchSekL1WithGap sek kube
@@ -105,15 +86,15 @@ matchSek sek kube =
     isL1OrGap _ = false
 
 -- Match Sek with only L1 elements (and possibly Gap)
-matchSekL1WithGap :: Lem Raw -> Kube -> List Kid
+matchSekL1WithGap :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchSekL1WithGap sek kube = toList $ matchSekL1WithGapCore sek kube true
 
 -- Legacy function for backward compatibility (kept for potential future use)
-_matchSekL1 :: Lem Raw -> Kube -> List Kid
+_matchSekL1 :: forall a. Ord a => Lem a -> Kube a -> List Kid
 _matchSekL1 sek kube = toList $ matchSekL1Core sek kube true
 
 -- Core Sek L1 matching with Gap support
-matchSekL1WithGapCore :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchSekL1WithGapCore :: forall a. Ord a => Lem a -> Kube a -> Boolean -> Set Kid
 matchSekL1WithGapCore sek kube withRootsFilter = allMatches
   where
     elements = collectElementsWithGap sek
@@ -149,7 +130,7 @@ matchSekL1WithGapCore sek kube withRootsFilter = allMatches
       else directMatches
 
 -- Core Sek L1 matching with optional roots filtering and parent discovery
-matchSekL1Core :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchSekL1Core :: forall a. Ord a => Lem a -> Kube a -> Boolean -> Set Kid
 matchSekL1Core sek kube withRootsFilter = allMatches
   where
     elements = collectElements sek
@@ -185,7 +166,7 @@ matchSekL1Core sek kube withRootsFilter = allMatches
       else directMatches
 
 -- Find parent Seks that contain the given Kids at the correct positions via refSeqs
-findParentSeks :: Array Kid -> Kube -> Set Kid
+findParentSeks :: forall a. Array Kid -> Kube a -> Set Kid
 findParentSeks matchedKids kube = 
   case matchedKids of
     [] -> Set.empty
@@ -205,11 +186,11 @@ findParentSeks matchedKids kube =
       in Set.filter hasMatchedKidAtPos0 candidates
 
 -- Match Sek with composite elements
-matchSekComposite :: Lem Raw -> Kube -> List Kid
+matchSekComposite :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchSekComposite sek kube = toList $ matchSekCompositeCore sek kube true
 
 -- Core Sek composite matching with optional roots filtering
-matchSekCompositeCore :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchSekCompositeCore :: forall a. Ord a => Lem a -> Kube a -> Boolean -> Set Kid
 matchSekCompositeCore sek kube withRootsFilter = allMatches
   where
     elements = collectSekElements sek
@@ -250,7 +231,7 @@ matchSekCompositeCore sek kube withRootsFilter = allMatches
       else directMatches
 
 -- Internal match function that returns direct Kids without roots filtering
-matchDirect :: Lem Raw -> Kube -> Set Kid
+matchDirect :: forall a. Ord a => Lem a -> Kube a -> Set Kid
 matchDirect query kube = case query of
   L0 -> Set.empty
   Gap -> Set.empty
@@ -272,7 +253,7 @@ matchDirect query kube = case query of
     isL1 (L1 _) = true
     isL1 _ = false
 
-matchL1Direct :: Raw -> Kube -> Set Kid
+matchL1Direct :: forall a. Ord a => a -> Kube a -> Set Kid
 matchL1Direct a kube = 
   let seqMatches = case getSeqBiAt 0 kube of
         Just getVals -> getVals a
@@ -284,27 +265,27 @@ matchL1Direct a kube =
           else Set.filter (\k -> isBagOrChoice k kube) keysMatches
   in Set.union seqMatches bagChoiceMatches
 
-matchSekL1Direct :: Lem Raw -> Kube -> Set Kid
+matchSekL1Direct :: forall a. Ord a => Lem a -> Kube a -> Set Kid
 matchSekL1Direct sek kube = matchSekL1Core sek kube false
 
-matchSekCompositeDirect :: Lem Raw -> Kube -> Set Kid
+matchSekCompositeDirect :: forall a. Ord a => Lem a -> Kube a -> Set Kid
 matchSekCompositeDirect sek kube = matchSekCompositeCore sek kube false
 
-matchBagL1Direct :: Lem Raw -> Kube -> Set Kid
+matchBagL1Direct :: forall a. Ord a => Lem a -> Kube a -> Set Kid
 matchBagL1Direct bag kube = matchBagL1Core bag kube false
 
-matchBagCompositeDirect :: Lem Raw -> Kube -> Set Kid
+matchBagCompositeDirect :: forall a. Ord a => Lem a -> Kube a -> Set Kid
 matchBagCompositeDirect bag kube = matchBagCompositeCore bag kube false
 
 -- Collect Lem elements from Sek (not decomposed to L1)
-collectSekElements :: Lem Raw -> Array (Lem Raw)
+collectSekElements :: forall a. Lem a -> Array (Lem a)
 collectSekElements = collect []
   where
     collect acc (Sek l1 l2 rest) = foldl (\a l -> Array.snoc a l) (Array.snoc (Array.snoc acc l1) l2) rest
     collect acc other = Array.snoc acc other
 
 -- Collect L1 elements from Lem recursively
-collectElements :: Lem Raw -> Array Raw
+collectElements :: forall a. Lem a -> Array a
 collectElements = collect []
   where
     collect acc (L1 a) = Array.snoc acc a
@@ -314,7 +295,7 @@ collectElements = collect []
     collect acc _ = acc
 
 -- Collect elements with Gap (Nothing = Gap, Just Raw = L1)
-collectElementsWithGap :: Lem Raw -> Array (Maybe Raw)
+collectElementsWithGap :: forall a. Lem a -> Array (Maybe a)
 collectElementsWithGap = collect []
   where
     collect acc (L1 a) = Array.snoc acc (Just a)
@@ -325,7 +306,7 @@ collectElementsWithGap = collect []
     collect acc _ = acc
 
 -- Find candidates from first non-Gap element at its position
-findFirstNonGapCandidates :: Array (Maybe Raw) -> Kube -> Set Kid
+findFirstNonGapCandidates :: forall a. Ord a => Array (Maybe a) -> Kube a -> Set Kid
 findFirstNonGapCandidates elements kube = go 0
   where
     numElements = Array.length elements
@@ -363,7 +344,7 @@ findFirstNonGapCandidates elements kube = go 0
             not Set.isEmpty (getKeys dataBi kid)
           Nothing -> false
 
-matchBag :: Lem Raw -> Kube -> List Kid
+matchBag :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchBag bag kube = 
   if allL1OrGap bag
     then matchBagL1WithGap bag kube
@@ -376,15 +357,15 @@ matchBag bag kube =
     isL1OrGap _ = false
 
 -- Match Bag with L1 and Gap elements
-matchBagL1WithGap :: Lem Raw -> Kube -> List Kid
+matchBagL1WithGap :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchBagL1WithGap bag kube = toList $ matchBagL1WithGapCore bag kube true
 
 -- Match Bag with only L1 elements (kept for potential future use)
-_matchBagL1 :: Lem Raw -> Kube -> List Kid
+_matchBagL1 :: forall a. Ord a => Lem a -> Kube a -> List Kid
 _matchBagL1 bag kube = toList $ matchBagL1Core bag kube true
 
 -- Core Bag L1 with Gap matching - Gap means at least one more element
-matchBagL1WithGapCore :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchBagL1WithGapCore :: forall a. Ord a => Lem a -> Kube a -> Boolean -> Set Kid
 matchBagL1WithGapCore bag kube withRootsFilter = allMatches
   where
     allElements = collectElementsWithGap bag
@@ -425,7 +406,7 @@ matchBagL1WithGapCore bag kube withRootsFilter = allMatches
       else directMatches
 
 -- Core Bag L1 matching with optional roots filtering and parent discovery
-matchBagL1Core :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchBagL1Core :: forall a. Ord a => Lem a -> Kube a -> Boolean -> Set Kid
 matchBagL1Core bag kube withRootsFilter = allMatches
   where
     elements = collectElements bag
@@ -457,7 +438,7 @@ matchBagL1Core bag kube withRootsFilter = allMatches
       else directMatches
 
 -- Find parent Bags that contain the given Kids via refKeys
-findParentBags :: Array Kid -> Kube -> Set Kid
+findParentBags :: forall a. Array Kid -> Kube a -> Set Kid
 findParentBags matchedKids kube = 
   case matchedKids of
     [] -> Set.empty
@@ -468,11 +449,11 @@ findParentBags matchedKids kube =
       in Set.filter (\k -> Set.member k kube.sets) candidates
 
 -- Match Bag with composite elements
-matchBagComposite :: Lem Raw -> Kube -> List Kid
+matchBagComposite :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchBagComposite bag kube = toList $ matchBagCompositeCore bag kube true
 
 -- Core Bag composite matching with optional roots filtering and parent discovery
-matchBagCompositeCore :: Lem Raw -> Kube -> Boolean -> Set Kid
+matchBagCompositeCore :: forall a. Ord a => Lem a -> Kube a -> Boolean -> Set Kid
 matchBagCompositeCore bag kube withRootsFilter = allMatches
   where
     elements = collectBagElementLems bag
@@ -512,13 +493,13 @@ matchBagCompositeCore bag kube withRootsFilter = allMatches
       else directMatches
 
 -- Collect Lem elements from Bag (not decomposed to L1)
-collectBagElementLems :: Lem Raw -> Array (Lem Raw)
+collectBagElementLems :: forall a. Lem a -> Array (Lem a)
 collectBagElementLems = collect []
   where
     collect acc (Bag l1 l2 rest) = foldl (\a l -> Array.snoc a l) (Array.snoc (Array.snoc acc l1) l2) rest
     collect acc other = Array.snoc acc other
 
-matchPair :: Lem Raw -> Lem Raw -> Kube -> List Kid
+matchPair :: forall a. Ord a => Lem a -> Lem a -> Kube a -> List Kid
 matchPair keyLem valLem kube = case keyLem, valLem of
   L1 k, L1 v -> toList matches
     where
@@ -539,7 +520,7 @@ matchPair keyLem valLem kube = case keyLem, valLem of
           in Set.union standalonePairs parentDicts
   _, _ -> mempty
 
-matchDict :: Lem Raw -> Kube -> List Kid
+matchDict :: forall a. Ord a => Lem a -> Kube a -> List Kid
 matchDict dict kube = toList matches
   where
     pairs = collectPairs dict
@@ -588,7 +569,7 @@ collectPairs = collect []
     collectFromTuple acc (Tuple (L1 k) (L1 v)) = Array.snoc acc (k /\ v)
     collectFromTuple acc _ = acc
 
-matchDict' :: Dict1 Raw -> Kube -> List Kid
+matchDict' :: forall a. Ord a => Dict1 a -> Kube a -> List Kid
 matchDict' dict kube = case dict of
   D1 (L1 k) (L1 v) -> matchPair (L1 k) (L1 v) kube
   D2 p1 p2 rest -> matchDict (Dict p1 p2 rest) kube

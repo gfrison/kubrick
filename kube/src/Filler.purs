@@ -21,28 +21,14 @@ import Kubrick.Types (Raw, Term(..), Vid, RawType(..))
 type Extraction = { vid :: Maybe Vid, values :: Array (Array Raw) }
 
 type ExtractionResult = { vids :: Array Vid, rows :: Array (Array Raw) }
---| given a kube, a Kid and a query Lem Term, return a Reticolo of Vids on which 
---| all the values of the document with that Kid matching with Vids in the query
---| are stored as a single row in the returning Reticolo. ex:
---| kid doc: Sek (L1 (Rs "a")) (L1 (Rs "b")) Nil
---| query: Sek (L1 (Rs "a")) (L1 (TVid 1)) Nil
---| result: Reticolo [Vid 1] with one row [b]
---| all Raw and Gap values in the query are skipped.
---| in case of Bag/Choice, the returned Reticolo will have multiple rows, one for each possible match.
---|   if in the query's Bag/Choice there are values other than Vids, 
---|   those will be excluded from being added in the Reticolo's rows.
---|   if there are multiple Vids in query's Bag/Choice, the returned Reticolo will have multiple columns, 
---|   one for each Vid, and the combinations will be generated accordingly like a cross-product.
---| if the Vid is occupying a nested structure in the kid document, The Vid would not be stored in the Reticolo.
---| if no match return an error
 
-fill :: Kube -> Kid -> Lem Term -> Either String (Reticolo Vid)
+fill :: Kube Raw -> Kid -> Lem Term -> Either String (Reticolo Vid)
 fill kube kid query = do
   doc <- getDocument kube kid
   result <- matchAndExtractWithVids query doc
   validateAndBuildReticolo result
   where
-    getDocument :: Kube -> Kid -> Either String (Lem Raw)
+    getDocument :: Kube Raw -> Kid -> Either String (Lem Raw)
     getDocument k k_id = case Getter.get k k_id of
       Just d -> Right d
       Nothing -> Left $ "Kid " <> show k_id <> " not found in Kube"

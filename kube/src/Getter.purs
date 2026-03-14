@@ -14,15 +14,14 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\), type (/\))
 import Kubrick.Lem (Lem(..), (<+>), (<+))
 import Kubrick.Kube.Types (Kid, Bi, Kube, getKeys)
-import Kubrick.Types (Raw)
 
 -- | Reconstruct a Lem from a Kid in a Kube
 -- | This is the inverse operation of Builder.add
-get :: Kube -> Kid -> Maybe (Lem Raw)
+get :: forall a. Eq a => Ord a => Kube a -> Kid -> Maybe (Lem a)
 get kube kid = reconstructLem Set.empty kid kube
 
 -- | Main reconstruction logic with cycle detection
-reconstructLem :: Set.Set Kid -> Kid -> Kube -> Maybe (Lem Raw)
+reconstructLem :: forall a. Eq a => Ord a => Set.Set Kid -> Kid -> Kube a -> Maybe (Lem a)
 reconstructLem visited kid kube
   | Set.member kid visited = Nothing  -- Cycle detected
   | otherwise =
@@ -50,12 +49,12 @@ reconstructLem visited kid kube
 -- | Combine sequence data with key-val data intelligently
 -- | If the key-val is a simple value (L1), append it to the sequence
 -- | Otherwise, combine as a Bag
-combineSekWithKeyVal :: Lem Raw -> Lem Raw -> Lem Raw
+combineSekWithKeyVal :: forall a. Eq a => Lem a -> Lem a -> Lem a
 combineSekWithKeyVal sek (L1 value) = value <+ sek  -- Prepend to create Bag
 combineSekWithKeyVal sek kvLem = sek <+> kvLem      -- Combine as Bag
 
 -- | Reconstruct sequence (Sek) from seqs array
-reconstructSeq :: Set.Set Kid -> Kid -> Kube -> Maybe (Lem Raw)
+reconstructSeq :: forall a. Eq a => Ord a => Set.Set Kid -> Kid -> Kube a -> Maybe (Lem a)
 reconstructSeq visited kid kube =
   let
     -- Collect all elements from all sequence positions
@@ -71,7 +70,7 @@ reconstructSeq visited kid kube =
           Nil -> Nothing
 
 -- | Collect elements from sequence positions for a specific Kid
-collectSeqElements :: Set.Set Kid -> Kid -> Kube -> Array (Lem Raw)
+collectSeqElements :: forall a. Eq a => Ord a => Set.Set Kid -> Kid -> Kube a -> Array (Lem a)
 collectSeqElements visited kid kube =
   let
     -- Get data values from regular seqs (with original positions preserved)
@@ -83,7 +82,7 @@ collectSeqElements visited kid kube =
     mergeSeqElements dataElems refElems
 
 -- | Merge data and ref Maybe elements, combining both arrays at their original positions
-mergeSeqElements :: Array (Maybe (Lem Raw)) -> Array (Maybe (Lem Raw)) -> Array (Lem Raw)
+mergeSeqElements :: forall a. Array (Maybe (Lem a)) -> Array (Maybe (Lem a)) -> Array (Lem a)
 mergeSeqElements dataElems refElems =
   let
     maxLen = max (Array.length dataElems) (Array.length refElems)
@@ -97,15 +96,15 @@ mergeSeqElements dataElems refElems =
       ) (Array.range 0 (maxLen - 1))
 
 -- | Get data element at a specific position
-getDataElemAtPos :: Int -> Bi Raw -> Kid -> Maybe (Lem Raw)
+getDataElemAtPos :: forall a. Ord a => Int -> Bi a -> Kid -> Maybe (Lem a)
 getDataElemAtPos _ bi kid =
   let
-    values = Set.toUnfoldable (getKeys bi kid) :: Array Raw
+    values = Set.toUnfoldable (getKeys bi kid)
   in
     Array.head values <#> L1
 
 -- | Get ref element at a specific position
-getRefElemAtPos :: Set.Set Kid -> Int -> Bi Kid -> Kid -> Kube -> Maybe (Lem Raw)
+getRefElemAtPos :: forall a. Eq a => Ord a => Set.Set Kid -> Int -> Bi Kid -> Kid -> Kube a -> Maybe (Lem a)
 getRefElemAtPos visited _ bi targetKid kube =
   let
     kidRefs = Set.toUnfoldable (getKeys bi targetKid) :: Array Kid
@@ -116,12 +115,12 @@ getRefElemAtPos visited _ bi targetKid kube =
 
 
 -- | Reconstruct key-value structure (Choice, Bag, Pair)
-reconstructKeyVal :: Set.Set Kid -> Kid -> Kube -> Maybe (Lem Raw)
+reconstructKeyVal :: forall a. Eq a => Ord a => Set.Set Kid -> Kid -> Kube a -> Maybe (Lem a)
 reconstructKeyVal visited kid kube =
   let
     -- Get data values
-    keyDataValues = Set.toUnfoldable (getKeys kube.keys kid) :: Array Raw
-    valDataValues = Set.toUnfoldable (getKeys kube.vals kid) :: Array Raw
+    keyDataValues = Set.toUnfoldable (getKeys kube.keys kid)
+    valDataValues = Set.toUnfoldable (getKeys kube.vals kid)
     -- Get Kid references
     keyRefValues = Set.toUnfoldable (getKeys kube.refKeys kid) :: Array Kid
     valRefValues = Set.toUnfoldable (getKeys kube.refVals kid) :: Array Kid
@@ -156,7 +155,7 @@ reconstructKeyVal visited kid kube =
       _ -> Nothing
 
 -- | Extract key-value tuples from Pair Lems
-extractPairs :: Array (Lem Raw) -> Maybe (Array (Tuple (Lem Raw) (Lem Raw)))
+extractPairs :: forall a. Array (Lem a) -> Maybe (Array (Tuple (Lem a) (Lem a)))
 extractPairs lems =
   let extracted = lems <#> \lem -> case lem of
         Pair k v -> Just (Tuple k v)
@@ -168,7 +167,7 @@ extractPairs lems =
      else Nothing
 
 -- | Reconstruct a Dict from an array of key-value tuples
-reconstructDictFromPairs :: Array (Tuple (Lem Raw) (Lem Raw)) -> Maybe (Lem Raw)
+reconstructDictFromPairs :: forall a. Array (Tuple (Lem a) (Lem a)) -> Maybe (Lem a)
 reconstructDictFromPairs pairs =
   case Array.uncons pairs of
     Nothing -> Nothing
@@ -180,7 +179,7 @@ reconstructDictFromPairs pairs =
           Just (Dict t1 t2 (List.fromFoldable rest))
 
 -- | Reconstruct a Pair or Dict from Lems
-reconstructPairFromLems :: Array (Lem Raw) -> Array (Lem Raw) -> Maybe (Lem Raw)
+reconstructPairFromLems :: forall a. Array (Lem a) -> Array (Lem a) -> Maybe (Lem a)
 reconstructPairFromLems keyLems valLems
   | Array.length keyLems /= Array.length valLems = Nothing
   | otherwise =
@@ -198,7 +197,7 @@ reconstructPairFromLems keyLems valLems
                   in Just (Dict (Tuple k1 v1) (Tuple k2 v2) (List.fromFoldable tuples))
 
 -- | Reconstruct a Bag from Lems
-reconstructBagFromLems :: Array (Lem Raw) -> Maybe (Lem Raw)
+reconstructBagFromLems :: forall a. Eq a => Array (Lem a) -> Maybe (Lem a)
 reconstructBagFromLems lems =
   case List.fromFoldable lems of
     x : y : rest -> Just (foldl (<+>) (x <+> y) rest)
@@ -206,7 +205,7 @@ reconstructBagFromLems lems =
     Nil -> Nothing
 
 -- | Reconstruct a Choice from Lems
-reconstructChoiceFromLems :: Array (Lem Raw) -> Maybe (Lem Raw)
+reconstructChoiceFromLems :: forall a. Array (Lem a) -> Maybe (Lem a)
 reconstructChoiceFromLems lems =
   case List.fromFoldable lems of
     x : y : rest -> Just (Choice x y rest)

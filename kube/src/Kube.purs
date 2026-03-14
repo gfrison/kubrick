@@ -31,20 +31,20 @@ import Kubrick.Lem (Lem)
 import Kubrick.Matcher as Matcher
 import Kubrick.Reticolo (Reticolo)
 import Kubrick.Filler as Filler
-import Kubrick.Types (Raw,Vid,Term)
+import Kubrick.Types (Raw, Vid, Term)
 
 -- | Add a Lem to a Kube starting with Kid 0
-add :: Kube -> Lem Raw -> (Kube /\ Kid)
+add :: forall a. Ord a => Kube a -> Lem a -> (Kube a /\ Kid)
 add kube lem = addFrom (kube /\ Kid 0) lem
 
 -- | Add a Lem to a Kube starting from a specific Kid
-addFrom :: (Kube /\ Kid) -> Lem Raw -> (Kube /\ Kid)
+addFrom :: forall a. Ord a => (Kube a /\ Kid) -> Lem a -> (Kube a /\ Kid)
 addFrom (kube /\ startKid) lem = 
   let Tuple insertedKid (Tuple _ newKube) = runState (Builder.add lem) (Tuple startKid kube)
   in newKube /\ insertedKid
 
 -- | Add multiple Lems to a Kube, returns the Kube and the last Kid added
-addAll :: forall f. Foldable f => Kube -> f (Lem Raw) -> (Kube /\ Kid)
+addAll :: forall f a. Foldable f => Ord a => Kube a -> f (Lem a) -> (Kube a /\ Kid)
 addAll kube lems = 
   let lemsArray = Array.fromFoldable lems
       Tuple lastKid (Tuple _ finalKube) = runState 
@@ -56,18 +56,18 @@ addAll kube lems =
   in finalKube /\ lastKid
 
 -- | State monad version of add (original Builder.add)
-addM :: Lem Raw -> State (Tuple Kid Kube) Kid
+addM :: forall a. Ord a => Lem a -> State (Tuple Kid (Kube a)) Kid
 addM = Builder.add
 
 infix 6 add as +
 infix 6 addFrom as +>
 infix 6 addAll as +*
 
-get :: Kube -> Kid -> Maybe (Lem Raw)
+get :: forall a. Eq a => Ord a => Kube a -> Kid -> Maybe (Lem a)
 get = Getter.get 
 
-match :: Kube -> Lem Raw -> List Kid 
+match :: forall a. Ord a => Kube a -> Lem a -> List Kid 
 match = Matcher.match
 
-fill :: Kube -> Kid -> Lem Term -> Either String (Reticolo Vid)
+fill :: Kube Raw -> Kid -> Lem Term -> Either String (Reticolo Vid)
 fill = Filler.fill
