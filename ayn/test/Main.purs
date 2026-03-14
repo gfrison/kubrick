@@ -247,9 +247,9 @@ main = runSpecAndExitProcess [consoleReporter] do
         Right (Bundles b) -> do
           Set.size b.methods.roots `shouldEqual` 1
           let expected = Dict
-                (Tuple (L1 (Rs "type")) (L1 (Rs "fun")))
-                (Tuple (L1 (Rs "head")) (Rs "f" +: L1 (Rs "X")))
-                (Tuple (L1 (Rs "body")) (Rs "g" +: L1 (Rs "X")) : Nil)
+                (Tuple (L1 (Ar (Rs "type"))) (L1 (Ar (Rs "fun"))))
+                (Tuple (L1 (Ar (Rs "head"))) (Ar (Rs "f") +: L1 (Av (Sar "X"))))
+                (Tuple (L1 (Ar (Rs "body"))) (Ar (Rs "g") +: L1 (Av (Sar "X"))) : Nil)
           -- Find the root Kid and verify
           case Set.findMin b.methods.roots of
             Just rootKid -> get b.methods rootKid `shouldEqual` Just expected
@@ -264,9 +264,9 @@ main = runSpecAndExitProcess [consoleReporter] do
         Right (Bundles b) -> do
           Set.size b.methods.roots `shouldEqual` 1
           let expected = Dict
-                (Tuple (L1 (Rs "type")) (L1 (Rs "impl")))
-                (Tuple (L1 (Rs "head")) (Rs "a" +: L1 (Rs "Y")))
-                (Tuple (L1 (Rs "body")) (Rs "b" +: L1 (Rs "Y")) : Nil)
+                (Tuple (L1 (Ar (Rs "type"))) (L1 (Ar (Rs "impl"))))
+                (Tuple (L1 (Ar (Rs "head"))) (Ar (Rs "a") +: L1 (Av (Sar "Y"))))
+                (Tuple (L1 (Ar (Rs "body"))) (Ar (Rs "b") +: L1 (Av (Sar "Y"))) : Nil)
           case Set.findMin b.methods.roots of
             Just rootKid -> get b.methods rootKid `shouldEqual` Just expected
             Nothing -> fail "No root Kid found"

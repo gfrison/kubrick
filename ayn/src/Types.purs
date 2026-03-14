@@ -24,7 +24,7 @@ instance showMethod :: Show Atom => Show Method where
   show (Impl r) = show r.head <> " -| " <> show r.body
 
 newtype Program = Program { facts :: List (Lem Raw), queries :: List (Lem Atom), methods :: List Method }
-newtype Bundles = Bundles { facts :: Kube Raw, methods :: Kube Raw, queries :: List (Lem Atom) }
+newtype Bundles = Bundles { facts :: Kube Raw, methods :: Kube Atom, queries :: List (Lem Atom) }
 
 derive instance eqProgram :: Eq Program
 
